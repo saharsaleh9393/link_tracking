@@ -3,6 +3,7 @@ import uuid
 from collections import OrderedDict
 from threading import Lock
 from time import monotonic
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
@@ -119,12 +120,25 @@ def create_campaign(body: CampaignCreate, session: Session = Depends(session_dep
 
 @router.get("/campaigns", response_model=list[CampaignOut])
 def list_campaigns(
+    response: Response,
     offset: int = Query(0, ge=0, le=100000),
     limit: int = Query(50, ge=1, le=500),
+    q: str = Query("", max_length=200),
+    archived: bool | None = None,
+    include_total: bool = False,
     session: Session = Depends(session_dependency),
 ):
+    query = select(Campaign)
+    if q:
+        query = query.where(Campaign.name.icontains(q, autoescape=True))
+    if archived is not None:
+        query = query.where(Campaign.archived == archived)
+    if include_total:
+        response.headers["X-Total-Count"] = str(
+            session.scalar(select(func.count()).select_from(query.subquery()))
+        )
     return session.scalars(
-        select(Campaign).order_by(Campaign.created_at, Campaign.id).offset(offset).limit(limit)
+        query.order_by(Campaign.created_at, Campaign.id).offset(offset).limit(limit)
     ).all()
 
 
@@ -171,17 +185,66 @@ def create_link(body: LinkCreate, session: Session = Depends(session_dependency)
 
 @router.get("/links", response_model=list[LinkOut])
 def list_links(
+    response: Response,
     campaign_id: uuid.UUID | None = None,
     offset: int = Query(0, ge=0, le=100000),
     limit: int = Query(50, ge=1, le=500),
+    q: str = Query("", max_length=200),
+    status: Literal["active", "disabled", "deleted"] | None = None,
+    sort_by: Literal["created_at", "updated_at", "slug", "status"] = "created_at",
+    descending: bool = False,
+    include_total: bool = False,
     session: Session = Depends(session_dependency),
 ):
     query = select(Link)
     if campaign_id:
         query = query.where(Link.campaign_id == campaign_id)
+    if q:
+        query = query.where(Link.slug.icontains(q, autoescape=True))
+    if status:
+        query = query.where(Link.status == status)
+    if include_total:
+        response.headers["X-Total-Count"] = str(
+            session.scalar(select(func.count()).select_from(query.subquery()))
+        )
+    column = getattr(Link, sort_by)
     return session.scalars(
-        query.order_by(Link.created_at, Link.id).offset(offset).limit(limit)
+        query.order_by(column.desc() if descending else column.asc(), Link.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
+
+
+@router.get("/management/overview")
+def management_overview(session: Session = Depends(session_dependency)):
+    values = (
+        session.execute(
+            select(
+                select(func.count())
+                .select_from(Link)
+                .where(Link.status != "deleted")
+                .scalar_subquery()
+                .label("total_links"),
+                select(func.count())
+                .select_from(Campaign)
+                .where(Campaign.archived.is_(False))
+                .scalar_subquery()
+                .label("active_campaigns"),
+            )
+        )
+        .mappings()
+        .one()
+    )
+    recent = (
+        session.execute(
+            select(AuditEvent.action, AuditEvent.resource_id, AuditEvent.occurred_at)
+            .order_by(AuditEvent.occurred_at.desc(), AuditEvent.id)
+            .limit(12)
+        )
+        .mappings()
+        .all()
+    )
+    return {**dict(values), "recent_activity": [dict(row) for row in recent]}
 
 
 @router.get("/links/{link_id}", response_model=LinkOut)

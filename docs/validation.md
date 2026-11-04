@@ -23,3 +23,13 @@ The native API and worker were started in managed execution sessions. A detached
 Not executed: native Windows/Laragon startup, Power BI Desktop/Service refresh, GitHub-hosted CI, remote SSH discovery/deployment, production backup scheduling or production load tests. Their instructions/interfaces are provided, but those execution environments have not been inspected or validated.
 
 `install_script` and `start_skill` were saved to the cloud configuration draft. Saving is separate from publishing and from validating restoration in a fresh task.
+
+## Streamlit dashboard — 2026-11-04
+
+Branch: `feat/streamlit-dashboard`. The complete suite now has **61 passing tests**, including all 37 original backend checks. Ruff lint and formatting pass using `uv sync --frozen --extra dashboard` dependencies. No database schema migration was added.
+
+New checks exercise Persian Streamlit forms through the actual authenticated HTTP adapter into FastAPI and PostgreSQL: create/edit/delete links, activation state, destination switching, create/archive campaigns, UTM charts and link comparisons, raw-click pagination/filter resets, search, server-side counts, form failures and unavailable API handling. An unrelated edit preserves the original expiry timestamp, including seconds and microseconds.
+
+Real Chromium checks exercised the running API/Streamlit pair on localhost, desktop and 390-pixel mobile layouts. API credentials were absent from the browser DOM and received WebSocket frames. Browser-test tools were isolated from the application's runtime dependency lock. Screenshots and generated state remain in ignored `.local/` files.
+
+Windows commands are documented but native Windows execution was not available here. The existing API exports remain compatible; no new Power BI integration or remote deployment was performed.

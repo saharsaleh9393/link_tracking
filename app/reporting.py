@@ -95,6 +95,9 @@ DIMENSIONS = {
     "browser": E.browser,
     "os": E.os,
     "classification": E.classification,
+    "utm_campaign": E.utm_campaign,
+    "utm_content": E.utm_content,
+    "utm_term": E.utm_term,
 }
 
 
@@ -110,6 +113,9 @@ def breakdown(
         "browser",
         "os",
         "classification",
+        "utm_campaign",
+        "utm_content",
+        "utm_term",
     ],
     f: Filters = Depends(filters),
     offset: int = Query(0, ge=0, le=100000),

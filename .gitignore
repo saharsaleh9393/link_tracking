@@ -10,3 +10,4 @@ __pycache__/
 htmlcov/
 *.log
 .local/
+.streamlit/secrets.toml

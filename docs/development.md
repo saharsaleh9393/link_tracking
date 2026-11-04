@@ -10,9 +10,10 @@ After an intentional dependency update:
 
 ```bash
 uv lock
-uv sync --frozen
+uv sync --frozen --extra dashboard
 uv export --frozen --no-dev --no-emit-project --format requirements-txt --output-file requirements.lock
-uv export --frozen --no-emit-project --format requirements-txt --output-file requirements-dev.lock
+uv export --frozen --extra dashboard --no-dev --no-emit-project --format requirements-txt --output-file requirements-dashboard.lock
+uv export --frozen --extra dashboard --no-emit-project --format requirements-txt --output-file requirements-dev.lock
 ```
 
 ## Tests
@@ -46,6 +47,8 @@ $env:TEST_DATABASE_URL='postgresql+psycopg://tracker:tracker_local_only@127.0.0.
 Tests fail rather than silently skipping integration checks if `TEST_DATABASE_URL` is absent. Test database names must contain `test`; additionally verify the hostname and user yourself. Tests must run serially against one database. The suite uses its own test-only keys and never prints application keys.
 
 Existing coverage exercises destination abuse, permissions, link lifecycle and version conflicts, snapshot attribution, concurrent clicks, missing/expired links, bot classification, trusted headers, daily HMAC rotation, keyset paging, aggregate repeatability and destination ownership constraints.
+
+Install `requirements-dev.lock` or use `uv sync --frozen --extra dashboard` for the complete suite. Streamlit's AppTest drives the real Persian forms through an HTTP adapter into the FastAPI test client and disposable PostgreSQL database. Tests cover dashboard creation/edit/deletion, destinations, campaigns, charts, expiry preservation, sanitized errors and server-only authorization. See [dashboard](dashboard.md).
 
 CI runs the same checks against PostgreSQL 17. It has not been executed on GitHub until a workflow run occurs.
 

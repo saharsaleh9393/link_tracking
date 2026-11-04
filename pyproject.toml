@@ -9,6 +9,9 @@ dependencies = [
   "user-agents>=2.2,<3", "prometheus-client>=0.21,<1",
 ]
 
+[project.optional-dependencies]
+dashboard = ["streamlit>=1.50,<2", "plotly>=6,<7", "httpx>=0.28,<1"]
+
 [dependency-groups]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.9,<1"]
 

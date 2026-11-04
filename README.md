@@ -1,7 +1,7 @@
 # Marketing Link Tracking
 
-بک‌اند قابل اجرای رهگیری لینک‌های بازاریابی با Python 3.12، FastAPI، SQLAlchemy و PostgreSQL 17.
-این پروژه API است؛ مدیریت و آزمایش تعاملی از Swagger انجام می‌شود و رابط داشبورد گرافیکی جداگانه ندارد.
+برنامه مدیریت و تحلیل لینک‌های بازاریابی با **رابط فارسی RTL در Streamlit**، نمودارهای Plotly و بک‌اند FastAPI، SQLAlchemy و PostgreSQL 17.
+بدون نیاز به Swagger یا Power BI می‌توانید لینک بسازید، کمپین‌ها و مقصدها را مدیریت کنید و گزارش ترافیک ببینید. رابط فقط از APIهای احراز‌شده موجود استفاده می‌کند.
 
 ## اجرا روی ویندوز
 
@@ -12,7 +12,7 @@ Laragon به‌تنهایی تضمین نمی‌کند PostgreSQL نصب باش�
 
 ```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\python -m pip install --require-hashes -r requirements-dev.lock
+.\.venv\Scripts\python -m pip install --require-hashes -r requirements-dashboard.lock
 ```
 
 برای ساخت تنظیمات محلی با سه کلید تصادفی مستقل؛ این دستور فایل موجود را بازنویسی نمی‌کند:
@@ -49,10 +49,17 @@ docker compose up -d db
 .\.venv\Scripts\python -m app.worker
 ```
 
-Swagger در مسیر `/docs` سرویس در دسترس است. در دکمه **Authorize** مقدار `ADMIN_API_KEY` را از فایل محلی خود وارد کنید. کلید را در چت، Git یا URL قرار ندهید.
-با `POST /api/v1/links` یک لینک بسازید و مسیر `/r/{slug}` را باز کنید. آدرس عمومی لینک از `PUBLIC_BASE_URL` و همین مسیر تشکیل می‌شود؛ این متغیر برای اسکریپت smoke هم استفاده می‌شود.
+در ترمینال سوم، رابط مدیریت را اجرا کنید:
 
-نمونه بدنه ساخت لینک:
+```powershell
+.\.venv\Scripts\python -m streamlit run streamlit_app.py
+```
+
+در مرورگر سیستم خود آدرس `http://127.0.0.1:8501` را باز کنید. از بخش **کمپین‌ها** کمپین بسازید، سپس در **لینک‌ها** آدرس مقصد را وارد و لینک رهگیری را کپی کنید. نمودارها در **تحلیل ترافیک** و جزئیات در **گزارش کلیک‌ها** هستند. کلیدها خودکار از تنظیمات سمت سرور خوانده می‌شوند؛ هیچ کلیدی را در مرورگر وارد نکنید.
+
+اگر `.env` را از نسخه قبلی دارید، ساخت دوباره لازم نیست. `DASHBOARD_API_URL` پیش‌فرض `http://127.0.0.1:8000` است؛ `PUBLIC_BASE_URL` آدرس لینک‌های قابل کپی را مشخص می‌کند. برای تست روی همان سیستم، پیش‌فرض‌ها کافی‌اند. لینک `127.0.0.1` از دستگاه دیگر قابل استفاده نیست؛ تنظیم دسترسی عمومی به مرحله استقرار مربوط است.
+
+Swagger همچنان برای توسعه‌دهندگان در مسیر `/docs` باقی مانده است؛ استفاده روزمره به آن نیاز ندارد. برای کار مستقیم با API، نمونه بدنه زیر قابل استفاده است:
 
 ```json
 {
@@ -78,7 +85,7 @@ The same workflow uses `.venv/bin/python`, `.venv/bin/alembic` and `.venv/bin/uv
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install --require-hashes -r requirements-dev.lock
+.venv/bin/python -m pip install --require-hashes -r requirements-dashboard.lock
 .venv/bin/python scripts/init_env.py
 docker compose up -d db
 .venv/bin/alembic upgrade head
@@ -86,9 +93,11 @@ docker compose up -d db
 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
 # Separate terminal:
 .venv/bin/python -m app.worker
+# Third terminal:
+.venv/bin/python -m streamlit run streamlit_app.py
 ```
 
-Alternatively use `uv sync --frozen` with the checked-in `uv.lock`. After intentional dependency changes, regenerate both exports with the commands in [development](docs/development.md).
+Alternatively use `uv sync --frozen --extra dashboard` with the checked-in `uv.lock`. Backend-only installs can continue using `requirements.lock`. See [dashboard documentation](docs/dashboard.md) for architecture and dependency exports.
 
 ## قابلیت‌ها و حدود فعلی
 
@@ -96,7 +105,8 @@ Alternatively use `uv sync --frozen` with the checked-in `uv.lock`. After intent
 - ثبت UUID کلیک، زمان UTC، UTM تاریخی، دستگاه، سیستم‌عامل، مرورگر، referrer پاک‌سازی‌شده و طبقه‌بندی اولیه bot/human/unknown.
 - HMAC روزانه بدون ذخیره IP خام. شاخص یکتای چند روز برابر تعداد افراد یکتا نیست؛ API آن را `estimated_visitor_days` می‌نامد.
 - کشور فقط از هدر یک reverse proxy مشخص و مورد اعتماد خوانده می‌شود؛ در اجرای عادی محلی مقدار آن `null` است.
-- گزارش‌ها، روند روزانه/ساعتی، مقایسه لینک و خروجی صفحه‌بندی‌شده Power BI.
+- رابط فارسی برای مدیریت لینک/کمپین/مقصد، جست‌وجو، فیلتر و صفحه‌بندی، کپی لینک و تأیید حذف.
+- نمودارهای تعاملی Streamlit/Plotly برای روند روزانه/ساعتی، منبع، رسانه، کمپین، دستگاه، مرورگر، کشور و UTM؛ مقایسه لینک و گزارش جزئیات کلیک. بدون وابستگی به Power BI.
 - پارتیشن ماهانه، worker تجمیع تکرارپذیر، نگهداری داده خام و شاخص‌های Prometheus.
 - Redis، Kafka و Kubernetes لازم نیستند و استفاده نشده‌اند.
 
@@ -105,7 +115,8 @@ Alternatively use `uv sync --frozen` with the checked-in `uv.lock`. After intent
 ## مستندات
 
 - [معماری، schema، حریم خصوصی و محدودیت‌ها](docs/architecture.md)
+- [راهنمای داشبورد فارسی و تنظیمات آن](docs/dashboard.md)
 - [تست و توسعه](docs/development.md)
-- [API و Power BI](docs/power-bi.md)
+- [مرجع خروجی‌های API قبلی](docs/power-bi.md)
 - [عملیات، backup و آمادگی استقرار](docs/operations.md)
 - [نتایج اجرای واقعی و محدودیت‌های اعتبارسنجی](docs/validation.md)
