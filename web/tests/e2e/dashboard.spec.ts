@@ -122,6 +122,18 @@ test("links, destination versions, redirects, analytics and soft deletion", asyn
   await expect(
     page.getByRole("cell").filter({ hasText: slug }).first(),
   ).toBeVisible();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const createdRow = page.getByRole("row").filter({ hasText: slug });
+  await createdRow
+    .getByRole("button", { name: "Copy tracking URL", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(backend + "/r/" + slug);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(createdRow.getByRole("status")).toHaveText(
+    "Tracking URL copied.",
+  );
   const redirect = await request.get(backend + "/r/" + slug, {
     maxRedirects: 0,
   });

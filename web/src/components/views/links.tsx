@@ -106,12 +106,7 @@ export function LinksView({ publicBase }: { publicBase: string }) {
           </span>
           <div>
             <p className="font-medium">{row.original.slug}</p>
-            <p
-              className="mt-1 max-w-44 truncate text-xs text-muted-foreground"
-              dir="ltr"
-            >
-              {publicBase}/r/{row.original.slug}
-            </p>
+            <CopyUrl compact value={`${publicBase}/r/${row.original.slug}`} />
           </div>
         </div>
       ),

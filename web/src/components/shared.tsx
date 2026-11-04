@@ -248,19 +248,42 @@ export function Pager({
     </div>
   );
 }
-export function CopyUrl({ value }: { value: string }) {
+export function CopyUrl({
+  value,
+  compact = false,
+}: {
+  value: string;
+  compact?: boolean;
+}) {
   const t = useTranslations();
   const [copied, setCopied] = useState(false),
     [failed, setFailed] = useState(false);
+  const Container = compact ? "div" : Card;
   return (
-    <Card className="flex items-center gap-2 bg-muted/40 p-3">
-      <code dir="ltr" className="min-w-0 flex-1 overflow-auto text-xs">
+    <Container
+      className={
+        compact
+          ? "flex max-w-64 flex-wrap items-center gap-1"
+          : "flex items-center gap-2 bg-muted/40 p-3"
+      }
+    >
+      <code
+        dir="ltr"
+        title={value}
+        className={
+          compact
+            ? "min-w-0 flex-1 truncate text-xs text-muted-foreground"
+            : "min-w-0 flex-1 overflow-auto text-xs"
+        }
+      >
         {value}
       </code>
       <Button
         variant="ghost"
         size="icon"
         aria-label={t("copy")}
+        title={t("copy")}
+        className={compact ? "size-8" : undefined}
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(value);
@@ -274,13 +297,27 @@ export function CopyUrl({ value }: { value: string }) {
         <Copy />
       </Button>
       <span
-        className={copied ? "text-xs text-emerald-700" : "sr-only"}
+        className={
+          copied
+            ? `text-xs text-emerald-700 ${compact ? "basis-full" : ""}`
+            : "sr-only"
+        }
         role="status"
       >
         {copied ? t("copied") : failed ? t("copyFailed") : ""}
       </span>
       {failed && <p className="text-xs">{t("copyFailed")}</p>}
-    </Card>
+      {failed && compact && (
+        <input
+          aria-label={t("trackingUrl")}
+          readOnly
+          value={value}
+          dir="ltr"
+          className="w-full rounded border p-1 text-xs"
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      )}
+    </Container>
   );
 }
 export function useDateFormat() {

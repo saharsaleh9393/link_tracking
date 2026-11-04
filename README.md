@@ -90,7 +90,7 @@ If FastAPI uses another port, set `TRACKER_API_URL` in `web\.env.local`; `PUBLIC
 - Overview KPIs, 7-day click activity and recent management activity.
 - Campaign autocomplete with keyboard support, explicit Search/Enter, Clear, case-insensitive matching, newest-first records, status, link counts, sorting and pagination.
 - Trimmed campaign names with database-enforced uniqueness, including concurrent requests; create/edit/archive/restore without touching historical clicks.
-- Link creation/editing, UTM attribution, campaign assignment, expiry, activation/deactivation, confirmed soft deletion and tracking URL copy.
+- Link creation/editing, UTM attribution, campaign assignment, expiry, activation/deactivation, confirmed soft deletion and tracking URL copy directly from each table row, without opening the editor.
 - Destination versions, addition and explicit active-destination selection, including a dedicated Destinations page.
 - Interactive traffic trends and campaign/source/medium/device/browser/country/OS/UTM breakdowns, date/campaign/link filters and link comparisons.
 - Cursor-paginated raw-click reports without raw IP or visitor digest exposure.
