@@ -8,6 +8,8 @@ Files use UTF-8 with BOM for Persian text in Windows Excel, stable English field
 
 Browser downloads are bounded to **50,000 rows per file**, support cancellation and combine server pages without repeated headers. Exceeding the bound produces an explicit message and no partial file. Narrow the filters or use the paginated API for larger datasets. The retention warning also applies to exports.
 
+After pulling updates, restart FastAPI and Next.js (rebuild Next.js if using `npm run start`). For compatibility with older running APIs, the dashboard retries a missing CSV endpoint through its existing JSON reporting endpoint and serializes the same filtered page server-side. Pagination, reporting authentication and spreadsheet escaping are preserved. Authentication failures never trigger a retry. If both endpoints are missing, a localized error directs you to check `TRACKER_API_URL` and restart the services.
+
 ## Read-only API access
 
 The existing `REPORT_API_KEY` in the backend environment authorizes reporting only; it cannot create/edit links or campaigns. Keep its **value** in the reporting tool's secure environment or credential store. Do not put it in a URL, browser JavaScript, screenshots or Git. The dashboard's API Guide contains placeholders only. Direct integrations use FastAPI, not the dashboard's private session-cookie bridge.

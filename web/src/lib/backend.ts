@@ -1,4 +1,5 @@
 import "server-only";
+import { jsonReportPath, reportCsv } from "./csv";
 const uuid = "[0-9a-fA-F-]{36}";
 const resources = new RegExp(
   `^(links|campaigns|links/${uuid}|campaigns/${uuid}|links/${uuid}/destinations|management/overview|reporting/(status|links|campaigns)|analytics/(summary|trends|breakdowns|link-comparison|trends\\.csv|breakdowns\\.csv)|exports/clicks(?:\\.csv)?)$`,
@@ -35,7 +36,14 @@ export async function backend(
   method: string,
   query: URLSearchParams,
   body?: string,
-) {
+): Promise<{
+  status: number;
+  error?: string;
+  data?: unknown;
+  total?: string | null;
+  csv?: ArrayBuffer;
+  csvHeaders?: Record<string, string>;
+}> {
   const key =
     path.startsWith("analytics/") ||
     path.startsWith("exports/") ||
@@ -75,6 +83,29 @@ export async function backend(
       redirect: "error",
       signal: AbortSignal.timeout(10000),
     });
+    // Older/running FastAPI instances can serve JSON reports but not the new CSV routes.
+    // Retry only a missing CSV read, with the same reporting key, filters and page cursor.
+    const compatiblePath = jsonReportPath(path);
+    if (response.status === 404 && method === "GET" && compatiblePath) {
+      const jsonUrl = new URL(url);
+      jsonUrl.pathname = jsonUrl.pathname.slice(0, -4);
+      const jsonResponse = await fetch(jsonUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${key}` },
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!jsonResponse.ok)
+        return {
+          error:
+            jsonResponse.status === 404
+              ? "CSV_UNAVAILABLE"
+              : statusCode(jsonResponse.status),
+          status: jsonResponse.status === 404 ? 503 : jsonResponse.status,
+        };
+      return reportCsv(path, await jsonResponse.json());
+    }
     if (!response.ok)
       return {
         error:

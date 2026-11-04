@@ -10,6 +10,7 @@ import {
 import { allowedRoute, backend } from "../src/lib/backend";
 import { reportRange } from "../src/lib/utils";
 import { sameOrigin } from "../src/lib/auth";
+import { reportCsv, jsonReportPath } from "../src/lib/csv";
 describe("bilingual messages", () => {
   it("has the same translated keys and interpolation variables", () => {
     expect(Object.keys(fa).sort()).toEqual(Object.keys(en).sort());
@@ -49,6 +50,8 @@ describe("API boundary", () => {
     expect(allowedRoute("exports/clicks.csv", "GET")).toBe(true);
     expect(allowedRoute("reporting/links", "GET")).toBe(true);
     expect(allowedRoute("exports/clicks.csv", "POST")).toBe(false);
+    expect(allowedRoute("analytics/trends.csv", "GET")).toBe(true);
+    expect(allowedRoute("analytics/breakdowns.csv", "GET")).toBe(true);
     expect(allowedRoute("links", "POST")).toBe(true);
     expect(allowedRoute("analytics/summary", "GET")).toBe(true);
     for (const path of [
@@ -61,6 +64,78 @@ describe("API boundary", () => {
     ])
       expect(allowedRoute(path, "GET")).toBe(false);
     expect(allowedRoute("analytics/summary", "DELETE")).toBe(false);
+  });
+  it.each([
+    "exports/clicks.csv",
+    "analytics/trends.csv",
+    "analytics/breakdowns.csv",
+  ])(
+    "exports %s through the JSON report when CSV returns 404",
+    async (path) => {
+      vi.stubEnv("REPORT_API_KEY", "test-report-key");
+      vi.stubEnv("TRACKER_API_URL", "http://127.0.0.1:8000");
+      const query = new URLSearchParams({
+        start: "2026-11-01T00:00:00Z",
+        end: "2026-11-05T00:00:00Z",
+        limit: "50",
+        cursor: "page-cursor",
+      });
+      const calls: { url: URL; key: string }[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: URL, init: RequestInit) => {
+          calls.push({
+            url: new URL(url),
+            key: new Headers(init.headers).get("Authorization") || "",
+          });
+          return url.pathname.endsWith(".csv")
+            ? new Response("missing", { status: 404 })
+            : Response.json({
+                items: [
+                  {
+                    click_id: "click-1",
+                    value: "instagram",
+                    bucket: "2026-11-01",
+                    total_clicks: 1,
+                  },
+                ],
+                next_cursor: "next-page",
+                partial_history: true,
+              });
+        }),
+      );
+      const result = await backend(path, "GET", query);
+      expect(result.status).toBe(200);
+      expect(result.csvHeaders?.["X-Next-Cursor"]).toBe("next-page");
+      expect(result.csvHeaders?.["X-Partial-History"]).toBe("true");
+      expect(calls.map((c) => c.url.pathname)).toEqual([
+        "/api/v1/" + path,
+        "/api/v1/" + path.slice(0, -4),
+      ]);
+      expect(
+        calls.every(
+          (c) =>
+            c.url.search === "?" + query.toString() &&
+            c.key === "Bearer test-report-key",
+        ),
+      ).toBe(true);
+      expect(new TextDecoder().decode(result.csv)).not.toContain(
+        "test-report-key",
+      );
+    },
+  );
+  it("does not retry rejected CSV credentials and explains missing reporting routes", async () => {
+    vi.stubEnv("REPORT_API_KEY", "test-report-key");
+    const fetcher = vi.fn(async () => new Response("", { status: 401 }));
+    vi.stubGlobal("fetch", fetcher);
+    expect(
+      await backend("exports/clicks.csv", "GET", new URLSearchParams()),
+    ).toEqual({ error: "AUTH", status: 401 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    fetcher.mockImplementation(async () => new Response("", { status: 404 }));
+    expect(
+      await backend("exports/clicks.csv", "GET", new URLSearchParams()),
+    ).toEqual({ error: "CSV_UNAVAILABLE", status: 503 });
   });
   it("forwards CSV continuation metadata using the read-only key", async () => {
     vi.stubEnv("REPORT_API_KEY", "test-report-key");
@@ -134,6 +209,27 @@ describe("API boundary", () => {
     await backend("analytics/summary", "GET", new URLSearchParams());
     expect(authorization).toBe("Bearer test-report-key");
   });
+});
+it("serializes legacy JSON with Persian text, safe spreadsheet cells and no private columns", () => {
+  const report = reportCsv("exports/clicks.csv", {
+    items: [
+      {
+        click_id: "one",
+        utm_source: "فارسی, منبع",
+        utm_content: "=SUM(1,1)",
+        visitor_digest: "PRIVATE-VISITOR",
+        ip: "PRIVATE-IP",
+      },
+    ],
+  });
+  const bytes = new Uint8Array(report.csv);
+  expect(Array.from(bytes.slice(0, 3))).toEqual([239, 187, 191]);
+  const csv = new TextDecoder().decode(bytes);
+  expect(csv).toContain('"فارسی, منبع"');
+  expect(csv).toContain('"\'=SUM(1,1)"');
+  expect(csv).not.toContain("PRIVATE");
+  expect(jsonReportPath("__proto__")).toBeNull();
+  expect(jsonReportPath("unlisted.csv")).toBeNull();
 });
 it("builds inclusive UTC date filters and rejects reversed ranges", () => {
   expect(reportRange("2026-11-04", "2026-11-04")).toEqual({

@@ -209,5 +209,6 @@
   "apiGuide": "Reporting API guide",
   "apiGuideHint": "Read data directly from FastAPI with the dedicated read-only REPORT_API_KEY, stored securely in your reporting service environment. The dashboard never displays the key.",
   "apiPagination": "Pass timezone-aware start/end dates. Follow next_cursor until null; keep filters unchanged. CSV pages return X-Next-Cursor or X-Next-Offset.",
-  "apiReadOnly": "Use reporting/links and reporting/campaigns for readable ID mappings. The reporting key cannot create or edit campaigns or links. See docs/reporting-api.md for examples."
+  "apiReadOnly": "Use reporting/links and reporting/campaigns for readable ID mappings. The reporting key cannot create or edit campaigns or links. See docs/reporting-api.md for examples.",
+  "error_CSV_UNAVAILABLE": "The reporting endpoint is unavailable. Update and restart FastAPI and Next.js, then verify TRACKER_API_URL points to the API."
 }

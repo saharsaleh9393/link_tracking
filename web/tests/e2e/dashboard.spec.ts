@@ -315,4 +315,28 @@ test("click report cursor pagination is preserved through the authenticated UI",
   expect(exported.split("\r\n").filter(Boolean)).toHaveLength(103);
   expect(exported.match(/occurred_at/g)).toHaveLength(1);
   expect(exported).not.toContain("visitor_digest");
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Traffic Analytics", exact: true })
+    .click();
+  await page.getByLabel("Links", { exact: true }).selectOption(link.id);
+  await page
+    .getByRole("button", { name: "Apply filters", exact: true })
+    .click();
+  await expect(page.locator("svg.recharts-surface").first()).toBeVisible();
+  for (const [button, header] of [
+    ["Export trends CSV", "bucket"],
+    ["Export breakdown CSV", "value"],
+  ]) {
+    const ready = page.waitForEvent("download");
+    await page.getByRole("button", { name: button, exact: true }).click();
+    const file = await ready;
+    const filename = testInfo.outputPath(header + ".csv");
+    await file.saveAs(filename);
+    const csv = await readFile(filename, "utf8");
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect(csv.split("\r\n").filter(Boolean).length).toBeGreaterThan(1);
+    expect(csv.split("\r\n")[0]).toContain(header);
+    expect(csv.split("\r\n")[0]).toContain("total_clicks");
+  }
 });
