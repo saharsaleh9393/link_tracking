@@ -1,0 +1,73 @@
+@import "tailwindcss";
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: #fff;
+  --color-card-foreground: var(--foreground);
+  --color-primary: #5b50d6;
+  --color-primary-foreground: #fff;
+  --color-muted: #f3f5f9;
+  --color-muted-foreground: #748096;
+  --color-border: #e8ebf1;
+  --color-input: #dfe4ed;
+  --color-ring: #a59df0;
+  --color-destructive: #dc3545;
+  --font-sans: Arial, Helvetica, Tahoma, sans-serif;
+}
+:root {
+  --background: #f7f8fc;
+  --foreground: #202b45;
+}
+* {
+  border-color: var(--color-border);
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, Tahoma, sans-serif;
+}
+html[lang="fa"] body {
+  font-family: Tahoma, Arial, sans-serif;
+  line-height: 1.8;
+}
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+select {
+  height: 2.5rem;
+  border: 1px solid var(--color-input);
+  border-radius: 0.5rem;
+  background: white;
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  max-width: 100%;
+}
+input[type="date"],
+input[type="datetime-local"],
+input[type="url"],
+code {
+  direction: ltr;
+}
+input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  width: 1rem;
+  height: 1rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

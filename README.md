@@ -1,122 +1,125 @@
-# Marketing Link Tracking
+# Linkspace · Marketing Link Tracking
 
-برنامه مدیریت و تحلیل لینک‌های بازاریابی با **رابط فارسی RTL در Streamlit**، نمودارهای Plotly و بک‌اند FastAPI، SQLAlchemy و PostgreSQL 17.
-بدون نیاز به Swagger یا Power BI می‌توانید لینک بسازید، کمپین‌ها و مقصدها را مدیریت کنید و گزارش ترافیک ببینید. رابط فقط از APIهای احراز‌شده موجود استفاده می‌کند.
+A bilingual marketing management dashboard: **Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/ui components, next-intl, TanStack Table and Recharts**, backed by FastAPI and PostgreSQL.
 
-## اجرا روی ویندوز
+رابط انگلیسی/فارسی برای مدیریت کمپین، لینک و مقصدها و تحلیل کلیک‌ها. زبان اولین بازدید همیشه انگلیسی است؛ EN / FA زبان را ذخیره می‌کند و بدون از دست‌رفتن صفحه، فرم یا فیلتر بین LTR و RTL جابه‌جا می‌شود. نیازی به Swagger یا Power BI برای استفاده روزمره نیست.
 
-دستورات زیر را در PowerShell و داخل پوشه پروژه اجرا کنید. ابتدا Python 3.12 یا جدیدتر و PostgreSQL 17 را نصب کنید.
-Laragon به‌تنهایی تضمین نمی‌کند PostgreSQL نصب باشد؛ MySQL آن برای این پروژه استفاده نمی‌شود.
+Navigation: **Overview → Campaigns → Links → Destinations → Traffic Analytics → Click Reports**.
 
-برای ساخت محیط مجازی و نصب نسخه‌های قفل‌شده وابستگی‌ها:
+## Windows setup — CMD
 
-```powershell
+Run these commands in **Command Prompt (CMD)** from the checkout root. Requirements: Python 3.12, Node.js 24 LTS with npm, and PostgreSQL 17 (native or Docker Desktop). Laragon's MySQL is not used. This version is for local development; no SSH server deployment has been performed.
+
+Get this branch without changing `main`:
+
+```bat
+git fetch origin
+git switch feat/nextjs-admin-ui
+```
+
+Install Python dependencies and create local settings. The initializer preserves an existing `.env`:
+
+```bat
 py -3.12 -m venv .venv
-.\.venv\Scripts\python -m pip install --require-hashes -r requirements-dashboard.lock
+.venv\Scripts\python.exe -m pip install --require-hashes -r requirements.lock
+.venv\Scripts\python.exe scripts\init_env.py
 ```
 
-برای ساخت تنظیمات محلی با سه کلید تصادفی مستقل؛ این دستور فایل موجود را بازنویسی نمی‌کند:
+For a Docker development database:
 
-```powershell
-.\.venv\Scripts\python scripts/init_env.py
-```
-
-برای پایگاه داده یکی از دو روش را انتخاب کنید:
-
-1. در PostgreSQL محلی با pgAdmin یک نقش ورود `tracker` و یک دیتابیس `tracker` با مالکیت همان نقش بسازید؛ رمز انتخابی خود را در `DATABASE_URL` فایل `.env` وارد کنید. کاراکترهای ویژه رمز باید در URL درصدگذاری شوند. این نقش برای migration به مجوز ساخت جدول نیاز دارد.
-2. اگر Docker Desktop دارید، دستور زیر PostgreSQL محلی را روی پورت 5432 با volume پایدار بالا می‌آورد. اگر PostgreSQL دیگری این پورت را گرفته، ابتدا پورت آزاد را در Compose و `.env` هماهنگ کنید:
-
-```powershell
+```bat
 docker compose up -d db
 ```
 
-برای ساخت schema، پارتیشن‌ها و اجرای اولین نوبت نگهداری:
+Alternatively, create a native PostgreSQL database `tracker` owned by a login role, then set `DATABASE_URL` in `.env` to its connection URL. Encode special characters in URL passwords. Do not run Docker on a port already occupied by native PostgreSQL.
 
-```powershell
-.\.venv\Scripts\alembic upgrade head
-.\.venv\Scripts\python -m app.worker --once
+Apply schema migrations and run maintenance once:
+
+```bat
+.venv\Scripts\alembic.exe upgrade head
+.venv\Scripts\python.exe -m app.worker --once
 ```
 
-برای اجرای API محلی:
+**Existing campaigns:** migration `0002` enforces names that are unique ignoring case and surrounding whitespace. If existing duplicate/empty names are found, it stops atomically and preserves all data. Review and explicitly rename the conflicting records, then rerun. It never deletes or silently merges campaigns. Back up an existing database before migrations. Details: [web dashboard and migration notes](docs/web-dashboard.md).
 
-```powershell
-.\.venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
+Install the frontend and create a separate dashboard login:
+
+```bat
+cd web
+npm ci
+npm run init-env
+cd ..
 ```
 
-در یک ترمینال دیگر worker را اجرا کنید؛ این فرایند باید هنگام استفاده از پروژه فعال بماند:
+Read `DASHBOARD_PASSWORD` privately in `web\.env.local` to sign in. This is the dashboard login password, **not** an API key. The helper does not print credentials or overwrite existing settings. Next.js reads FastAPI keys server-side from the root `.env`.
 
-```powershell
-.\.venv\Scripts\python -m app.worker
+## Run locally — three CMD windows
+
+**Window 1 — FastAPI**, from the repository root:
+
+```bat
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
 ```
 
-در ترمینال سوم، رابط مدیریت را اجرا کنید:
+**Window 2 — worker**, from the repository root:
 
-```powershell
-.\.venv\Scripts\python -m streamlit run streamlit_app.py
+```bat
+.venv\Scripts\python.exe -m app.worker
 ```
 
-در مرورگر سیستم خود آدرس `http://127.0.0.1:8501` را باز کنید. از بخش **کمپین‌ها** کمپین بسازید، سپس در **لینک‌ها** آدرس مقصد را وارد و لینک رهگیری را کپی کنید. نمودارها در **تحلیل ترافیک** و جزئیات در **گزارش کلیک‌ها** هستند. کلیدها خودکار از تنظیمات سمت سرور خوانده می‌شوند؛ هیچ کلیدی را در مرورگر وارد نکنید.
+**Window 3 — Next.js**, from the repository root:
 
-اگر `.env` را از نسخه قبلی دارید، ساخت دوباره لازم نیست. `DASHBOARD_API_URL` پیش‌فرض `http://127.0.0.1:8000` است؛ `PUBLIC_BASE_URL` آدرس لینک‌های قابل کپی را مشخص می‌کند. برای تست روی همان سیستم، پیش‌فرض‌ها کافی‌اند. لینک `127.0.0.1` از دستگاه دیگر قابل استفاده نیست؛ تنظیم دسترسی عمومی به مرحله استقرار مربوط است.
-
-Swagger همچنان برای توسعه‌دهندگان در مسیر `/docs` باقی مانده است؛ استفاده روزمره به آن نیاز ندارد. برای کار مستقیم با API، نمونه بدنه زیر قابل استفاده است:
-
-```json
-{
-  "slug": "instagram-launch",
-  "destination_url": "https://www.instagram.com/example/?igsh=abc",
-  "utm_source": "instagram",
-  "utm_medium": "social",
-  "utm_campaign": "launch"
-}
+```bat
+cd web
+npm run dev
 ```
 
-`forward_utm` پیش‌فرض خاموش است تا مقصد دقیقاً حفظ شود. در حالت روشن، UTMها فقط وقتی در مقصد وجود ندارند به انتهای query اضافه می‌شوند.
+On **your own computer**, open `http://127.0.0.1:3000` and sign in. The development server binds only to localhost. Links copied with `PUBLIC_BASE_URL=http://127.0.0.1:8000` work on that same computer; a publicly reachable hostname is a later deployment decision.
 
-برای بررسی end-to-end سرویسِ روشن، اسکریپت زیر یک لینک آزمایشی می‌سازد، ریدایرکت و ثبت کلیک را بررسی می‌کند و لینک را soft-delete می‌کند:
+To verify/run the optimized frontend instead of development mode (inside `web`):
 
-```powershell
-.\.venv\Scripts\python scripts/smoke.py
+```bat
+npm run build
+npm run start
 ```
 
-## Linux/macOS development
+If FastAPI uses another port, set `TRACKER_API_URL` in `web\.env.local`; `PUBLIC_BASE_URL` is the separate public address shown in tracking links. Restart Next.js after environment changes.
 
-The same workflow uses `.venv/bin/python`, `.venv/bin/alembic` and `.venv/bin/uvicorn`:
+## Included workflows
 
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install --require-hashes -r requirements-dashboard.lock
-.venv/bin/python scripts/init_env.py
-docker compose up -d db
-.venv/bin/alembic upgrade head
-.venv/bin/python -m app.worker --once
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
-# Separate terminal:
-.venv/bin/python -m app.worker
-# Third terminal:
-.venv/bin/python -m streamlit run streamlit_app.py
+- Overview KPIs, 7-day click activity and recent management activity.
+- Campaign autocomplete with keyboard support, explicit Search/Enter, Clear, case-insensitive matching, newest-first records, status, link counts, sorting and pagination.
+- Trimmed campaign names with database-enforced uniqueness, including concurrent requests; create/edit/archive/restore without touching historical clicks.
+- Link creation/editing, UTM attribution, campaign assignment, expiry, activation/deactivation, confirmed soft deletion and tracking URL copy.
+- Destination versions, addition and explicit active-destination selection, including a dedicated Destinations page.
+- Interactive traffic trends and campaign/source/medium/device/browser/country/OS/UTM breakdowns, date/campaign/link filters and link comparisons.
+- Cursor-paginated raw-click reports without raw IP or visitor digest exposure.
+- English/Persian navigation, forms, errors, chart/table labels, notifications, accessible dialogs and responsive mobile navigation.
+
+Historical tracking events, analytics semantics, redirects, partitions and worker remain intact. Country is unknown unless a trusted source supplies it; human/bot classification is heuristic. Visitor-days are daily estimates, **not distinct people across a multi-day range**. Dates use the Gregorian calendar and UTC reporting boundaries.
+
+The previous Streamlit implementation is preserved on `feat/streamlit-dashboard` and in Git history (commit `2d99b74`); it is no longer the primary runtime on this branch. Existing export APIs remain compatible, with no new Power BI integration.
+
+## Verification
+
+Python tests require a **disposable** database named `tracker_test`; they truncate its contents:
+
+```bat
+.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.lock
+docker compose exec db createdb -U tracker tracker_test
+set TEST_DATABASE_URL=postgresql+psycopg://tracker:tracker_local_only@127.0.0.1:5432/tracker_test
+.venv\Scripts\pytest.exe -q
+.venv\Scripts\ruff.exe check .
+.venv\Scripts\ruff.exe format --check .
 ```
 
-Alternatively use `uv sync --frozen --extra dashboard` with the checked-in `uv.lock`. Backend-only installs can continue using `requirements.lock`. See [dashboard documentation](docs/dashboard.md) for architecture and dependency exports.
+Inside `web`:
 
-## قابلیت‌ها و حدود فعلی
+```bat
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-- کمپین، لینک با slug یکتا، چند مقصد ذخیره‌شده، انتخاب مقصد فعال، ویرایش با کنترل نسخه، غیرفعال‌سازی و حذف نرم.
-- ثبت UUID کلیک، زمان UTC، UTM تاریخی، دستگاه، سیستم‌عامل، مرورگر، referrer پاک‌سازی‌شده و طبقه‌بندی اولیه bot/human/unknown.
-- HMAC روزانه بدون ذخیره IP خام. شاخص یکتای چند روز برابر تعداد افراد یکتا نیست؛ API آن را `estimated_visitor_days` می‌نامد.
-- کشور فقط از هدر یک reverse proxy مشخص و مورد اعتماد خوانده می‌شود؛ در اجرای عادی محلی مقدار آن `null` است.
-- رابط فارسی برای مدیریت لینک/کمپین/مقصد، جست‌وجو، فیلتر و صفحه‌بندی، کپی لینک و تأیید حذف.
-- نمودارهای تعاملی Streamlit/Plotly برای روند روزانه/ساعتی، منبع، رسانه، کمپین، دستگاه، مرورگر، کشور و UTM؛ مقایسه لینک و گزارش جزئیات کلیک. بدون وابستگی به Power BI.
-- پارتیشن ماهانه، worker تجمیع تکرارپذیر، نگهداری داده خام و شاخص‌های Prometheus.
-- Redis، Kafka و Kubernetes لازم نیستند و استفاده نشده‌اند.
-
-این نسخه روی PostgreSQL و درخواست‌های هم‌زمان تست می‌شود؛ ظرفیت میلیون‌ها کلیک در واحد زمان، تشخیص قطعی ربات و استقرار production تأییدشده نیستند. برای انتشار واقعی باید روی سرور مقصد load test، TLS، محدودیت درخواست، backup/restore و نظارت تنظیم شوند. هیچ تغییری روی سرور SSH انجام نشده است.
-
-## مستندات
-
-- [معماری، schema، حریم خصوصی و محدودیت‌ها](docs/architecture.md)
-- [راهنمای داشبورد فارسی و تنظیمات آن](docs/dashboard.md)
-- [تست و توسعه](docs/development.md)
-- [مرجع خروجی‌های API قبلی](docs/power-bi.md)
-- [عملیات، backup و آمادگی استقرار](docs/operations.md)
-- [نتایج اجرای واقعی و محدودیت‌های اعتبارسنجی](docs/validation.md)
+[Browser-test instructions and security contracts](docs/web-dashboard.md) · [Backend architecture](docs/architecture.md) · [Operations](docs/operations.md) · [Validation evidence](docs/validation.md).

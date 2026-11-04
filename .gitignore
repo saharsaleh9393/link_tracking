@@ -11,3 +11,9 @@ htmlcov/
 *.log
 .local/
 .streamlit/secrets.toml
+web/node_modules/
+web/.next/
+web/*.tsbuildinfo
+web/next-env.d.ts
+web/playwright-report/
+web/test-results/

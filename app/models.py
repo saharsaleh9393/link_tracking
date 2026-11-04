@@ -37,6 +37,18 @@ class Campaign(Base):
     name: Mapped[str] = mapped_column(String(200))
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        Index(
+            "uq_campaigns_normalized_name",
+            func.lower(
+                func.btrim(
+                    name,
+                    " \t\n\r\v\f\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000",
+                )
+            ),
+            unique=True,
+        ),
+    )
 
 
 class Link(UTMMixin, Base):

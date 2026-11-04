@@ -112,9 +112,13 @@ def get_link(session, link_id, lock=False):
 def create_campaign(body: CampaignCreate, session: Session = Depends(session_dependency)):
     campaign = Campaign(name=body.name)
     session.add(campaign)
-    session.flush()
-    session.add(AuditEvent(action="campaign.create", resource_id=campaign.id))
-    session.commit()
+    try:
+        session.flush()
+        session.add(AuditEvent(action="campaign.create", resource_id=campaign.id))
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, "Campaign name already exists") from None
     return campaign
 
 
@@ -126,6 +130,9 @@ def list_campaigns(
     q: str = Query("", max_length=200),
     archived: bool | None = None,
     include_total: bool = False,
+    with_link_count: bool = False,
+    sort_by: Literal["created_at", "name", "archived", "link_count"] = "created_at",
+    descending: bool = False,
     session: Session = Depends(session_dependency),
 ):
     query = select(Campaign)
@@ -137,9 +144,26 @@ def list_campaigns(
         response.headers["X-Total-Count"] = str(
             session.scalar(select(func.count()).select_from(query.subquery()))
         )
-    return session.scalars(
-        query.order_by(Campaign.created_at, Campaign.id).offset(offset).limit(limit)
-    ).all()
+    link_count = (
+        select(func.count())
+        .select_from(Link)
+        .where(Link.campaign_id == Campaign.id, Link.status != "deleted")
+        .correlate(Campaign)
+        .scalar_subquery()
+    )
+    column = link_count if sort_by == "link_count" else getattr(Campaign, sort_by)
+    query = (
+        query.order_by(column.desc() if descending else column.asc(), Campaign.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    if with_link_count:
+        rows = session.execute(query.add_columns(link_count.label("link_count"))).all()
+        return [
+            CampaignOut.model_validate(campaign).model_copy(update={"link_count": count})
+            for campaign, count in rows
+        ]
+    return session.scalars(query).all()
 
 
 @router.patch("/campaigns/{campaign_id}", response_model=CampaignOut)
@@ -154,7 +178,11 @@ def update_campaign(
             raise HTTPException(422, f"{key} cannot be null")
         setattr(campaign, key, value)
     session.add(AuditEvent(action="campaign.update", resource_id=campaign.id))
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, "Campaign name already exists") from None
     return campaign
 
 

@@ -1,0 +1,93 @@
+import "server-only";
+const uuid = "[0-9a-fA-F-]{36}";
+const resources = new RegExp(
+  `^(links|campaigns|links/${uuid}|campaigns/${uuid}|links/${uuid}/destinations|management/overview|analytics/(summary|trends|breakdowns|link-comparison)|exports/clicks)$`,
+);
+export function allowedRoute(path: string, method: string) {
+  if (!resources.test(path)) return false;
+  if (method === "GET") return true;
+  if (method === "POST")
+    return (
+      /^(links|campaigns)$/.test(path) ||
+      new RegExp(`^links/${uuid}/destinations$`).test(path)
+    );
+  if (method === "PATCH")
+    return new RegExp(`^(links|campaigns)/${uuid}$`).test(path);
+  return method === "DELETE" && new RegExp(`^links/${uuid}$`).test(path);
+}
+export function statusCode(status: number) {
+  return (
+    (
+      {
+        401: "AUTH",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        409: "CONFLICT",
+        410: "GONE",
+        422: "VALIDATION",
+        429: "RATE_LIMIT",
+      } as Record<number, string>
+    )[status] || "UNAVAILABLE"
+  );
+}
+export async function backend(
+  path: string,
+  method: string,
+  query: URLSearchParams,
+  body?: string,
+) {
+  const key =
+    path.startsWith("analytics/") || path.startsWith("exports/")
+      ? process.env.REPORT_API_KEY
+      : process.env.ADMIN_API_KEY;
+  if (!key || key.startsWith("replace-"))
+    return { error: "CONFIG", status: 503 };
+  let base: URL;
+  try {
+    base = new URL(process.env.TRACKER_API_URL || "http://127.0.0.1:8000");
+  } catch {
+    return { error: "CONFIG", status: 503 };
+  }
+  if (
+    !["http:", "https:"].includes(base.protocol) ||
+    base.username ||
+    base.password ||
+    base.search ||
+    base.hash
+  )
+    return { error: "CONFIG", status: 503 };
+  const url = new URL(
+    `${base.pathname.replace(/\/$/, "")}/api/v1/${path}`,
+    base,
+  );
+  url.search = query.toString();
+  try {
+    const response = await fetch(url, {
+      method,
+      body,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok)
+      return {
+        error:
+          response.status === 409 && path.startsWith("campaigns")
+            ? "DUPLICATE"
+            : statusCode(response.status),
+        status: response.status,
+      };
+    const data = response.status === 204 ? null : await response.json();
+    return {
+      data,
+      total: response.headers.get("X-Total-Count"),
+      status: response.status,
+    };
+  } catch {
+    return { error: "UNAVAILABLE", status: 503 };
+  }
+}

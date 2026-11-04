@@ -10,10 +10,9 @@ After an intentional dependency update:
 
 ```bash
 uv lock
-uv sync --frozen --extra dashboard
+uv sync --frozen
 uv export --frozen --no-dev --no-emit-project --format requirements-txt --output-file requirements.lock
-uv export --frozen --extra dashboard --no-dev --no-emit-project --format requirements-txt --output-file requirements-dashboard.lock
-uv export --frozen --extra dashboard --no-emit-project --format requirements-txt --output-file requirements-dev.lock
+uv export --frozen --no-emit-project --format requirements-txt --output-file requirements-dev.lock
 ```
 
 ## Tests
@@ -48,7 +47,7 @@ Tests fail rather than silently skipping integration checks if `TEST_DATABASE_UR
 
 Existing coverage exercises destination abuse, permissions, link lifecycle and version conflicts, snapshot attribution, concurrent clicks, missing/expired links, bot classification, trusted headers, daily HMAC rotation, keyset paging, aggregate repeatability and destination ownership constraints.
 
-Install `requirements-dev.lock` or use `uv sync --frozen --extra dashboard` for the complete suite. Streamlit's AppTest drives the real Persian forms through an HTTP adapter into the FastAPI test client and disposable PostgreSQL database. Tests cover dashboard creation/edit/deletion, destinations, campaigns, charts, expiry preservation, sanitized errors and server-only authorization. See [dashboard](dashboard.md).
+Install `requirements-dev.lock` for the Python suite. The primary UI now lives in `web`; run `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` there. Browser tests run against a separate disposable FastAPI/PostgreSQL instance and validate bilingual workflows. See [web dashboard](web-dashboard.md).
 
 CI runs the same checks against PostgreSQL 17. It has not been executed on GitHub until a workflow run occurs.
 

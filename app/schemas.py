@@ -22,11 +22,26 @@ class CampaignCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=200)
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def clean_name(cls, value):
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Campaign name cannot be empty")
+        return value
+
 
 class CampaignUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str | None = Field(None, min_length=1, max_length=200)
     archived: bool | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def clean_name(cls, value):
+        return CampaignCreate.clean_name(value) if value is not None else None
 
 
 class CampaignOut(CampaignCreate):
@@ -34,6 +49,7 @@ class CampaignOut(CampaignCreate):
     id: uuid.UUID
     archived: bool
     created_at: datetime
+    link_count: int | None = None
 
 
 class DestinationCreate(BaseModel):

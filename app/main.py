@@ -76,7 +76,7 @@ def live():
 @app.get("/health/ready", tags=["Operations"])
 def ready(session: Session = Depends(session_dependency)):
     revision = session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
-    if revision != "0001":
+    if revision != "0002":
         raise HTTPException(503, "Database migration required")
     partition = session.scalar(
         text("SELECT to_regclass(:name)"), {"name": f"click_events_{datetime.now(UTC):%Y_%m}"}

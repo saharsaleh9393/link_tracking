@@ -29,3 +29,37 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql+psycopg://tracker:tracker_local_only@localhost:5432/tracker_test
         run: pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Frontend checks
+        working-directory: web
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm ci && npm run lint && npm run typecheck && npm test && npm run build
+      - name: Start isolated browser-test backend
+        env:
+          DATABASE_URL: postgresql+psycopg://tracker:tracker_local_only@127.0.0.1:5432/tracker_test
+          ADMIN_API_KEY: e2e-admin-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          REPORT_API_KEY: e2e-report-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          VISITOR_HMAC_KEY: e2e-visitor-cccccccccccccccccccccccccccccccccccccccc
+        run: |
+          alembic upgrade head
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8003 --no-access-log --no-proxy-headers > /tmp/tracker-e2e.log 2>&1 &
+          python - <<'PY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8003/health/ready', timeout=1) as r:
+                      assert r.status == 200
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit('Browser-test backend did not become ready')
+          PY
+      - name: Browser workflows
+        working-directory: web
+        run: npx playwright install --with-deps chromium && npm run test:e2e
