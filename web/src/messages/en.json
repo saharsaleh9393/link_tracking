@@ -193,5 +193,21 @@
   "catalogLimited": "Showing up to 500 records. Refine the search to find a specific item.",
   "nextChart": "More groups",
   "previousChart": "Previous groups",
-  "error_REQUIRED": "Complete the required fields."
+  "error_REQUIRED": "Complete the required fields.",
+  "exportCsv": "Export CSV",
+  "exportTrends": "Export trends CSV",
+  "exportBreakdown": "Export breakdown CSV",
+  "exportProgress": "Exporting {count} rows…",
+  "exportScope": "Exports use the applied filters and include all pages, up to 50,000 rows per file.",
+  "error_EXPORT_LIMIT": "This selection exceeds 50,000 rows. Narrow the filters or use the paginated reporting API; no partial file was downloaded.",
+  "countryReady": "Country lookup is configured",
+  "countryNotConfigured": "Country lookup is not configured yet",
+  "countryPrivate": "Local/private IPs cannot be geolocated. Public IP country is an estimate, not proof of residence.",
+  "countrySetup": "Install the country database from the repository root: python scripts/install_geoip.py, then restart the API.",
+  "countryFuture": "Lookup applies to new clicks. Historical unknowns cannot be recovered because raw IPs are not retained.",
+  "countryAttribution": "Free country database option: IP Geolocation by",
+  "apiGuide": "Reporting API guide",
+  "apiGuideHint": "Read data directly from FastAPI with the dedicated read-only REPORT_API_KEY, stored securely in your reporting service environment. The dashboard never displays the key.",
+  "apiPagination": "Pass timezone-aware start/end dates. Follow next_cursor until null; keep filters unchanged. CSV pages return X-Next-Cursor or X-Next-Offset.",
+  "apiReadOnly": "Use reporting/links and reporting/campaigns for readable ID mappings. The reporting key cannot create or edit campaigns or links. See docs/reporting-api.md for examples."
 }

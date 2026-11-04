@@ -8,6 +8,7 @@ from fastapi import Request
 from user_agents import parse
 
 from app.config import get_settings
+from app.country import country_lookup
 from app.schemas import UTM_FIELDS
 
 
@@ -101,6 +102,10 @@ def collect_metadata(request: Request, now: datetime) -> dict:
         # ISO country codes; reject edge sentinels and arbitrary two-letter strings.
         if value in COUNTRY_CODES:
             country = value
+    if country is None:
+        candidate = country_lookup.lookup(address)
+        if candidate in COUNTRY_CODES:
+            country = candidate
     return {
         "device": device,
         "os": ua.os.family[:100],

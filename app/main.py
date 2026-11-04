@@ -14,11 +14,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.csv_exports import router as csv_router
 from app.db import get_engine, session_dependency
 from app.links import resolve_link
 from app.links import router as management_router
 from app.models import ClickEvent
 from app.reporting import router as reporting_router
+from app.reporting_access import router as reporting_access_router
 from app.security import require_admin
 from app.tracking import collect_metadata, effective_utms, redirect_url
 
@@ -37,6 +39,8 @@ async def lifespan(app):
 app = FastAPI(title="Marketing Link Tracking", version="0.1.0", lifespan=lifespan)
 app.include_router(management_router)
 app.include_router(reporting_router)
+app.include_router(csv_router)
+app.include_router(reporting_access_router)
 
 
 @app.middleware("http")

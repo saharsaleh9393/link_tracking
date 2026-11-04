@@ -1,7 +1,7 @@
 import "server-only";
 const uuid = "[0-9a-fA-F-]{36}";
 const resources = new RegExp(
-  `^(links|campaigns|links/${uuid}|campaigns/${uuid}|links/${uuid}/destinations|management/overview|analytics/(summary|trends|breakdowns|link-comparison)|exports/clicks)$`,
+  `^(links|campaigns|links/${uuid}|campaigns/${uuid}|links/${uuid}/destinations|management/overview|reporting/(status|links|campaigns)|analytics/(summary|trends|breakdowns|link-comparison|trends\\.csv|breakdowns\\.csv)|exports/clicks(?:\\.csv)?)$`,
 );
 export function allowedRoute(path: string, method: string) {
   if (!resources.test(path)) return false;
@@ -37,7 +37,9 @@ export async function backend(
   body?: string,
 ) {
   const key =
-    path.startsWith("analytics/") || path.startsWith("exports/")
+    path.startsWith("analytics/") ||
+    path.startsWith("exports/") ||
+    path.startsWith("reporting/")
       ? process.env.REPORT_API_KEY
       : process.env.ADMIN_API_KEY;
   if (!key || key.startsWith("replace-"))
@@ -80,6 +82,25 @@ export async function backend(
             ? "DUPLICATE"
             : statusCode(response.status),
         status: response.status,
+      };
+    if (path.endsWith(".csv"))
+      return {
+        csv: await response.arrayBuffer(),
+        status: response.status,
+        csvHeaders: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="report.csv"',
+          "X-Export-Row-Count":
+            response.headers.get("X-Export-Row-Count") || "0",
+          "X-Partial-History":
+            response.headers.get("X-Partial-History") || "false",
+          ...(response.headers.get("X-Next-Cursor")
+            ? { "X-Next-Cursor": response.headers.get("X-Next-Cursor")! }
+            : {}),
+          ...(response.headers.get("X-Next-Offset")
+            ? { "X-Next-Offset": response.headers.get("X-Next-Offset")! }
+            : {}),
+        },
       };
     const data = response.status === 204 ? null : await response.json();
     return {

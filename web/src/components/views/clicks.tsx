@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useResource } from "@/lib/client";
+import { useResource, queryString } from "@/lib/client";
 import { initialRange, reportRange } from "@/lib/utils";
 import type { Click, ClickPage, ListPage, Link } from "@/lib/types";
 import {
@@ -14,6 +14,8 @@ import {
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { ReportFilters, type ReportSelection } from "../report-filters";
+import { CsvDownload } from "../csv-download";
+import { ApiGuide } from "../reporting-help";
 export function ClicksView() {
   const t = useTranslations(),
     date = useDateFormat(),
@@ -44,7 +46,22 @@ export function ClicksView() {
   const translated = (value: string) => (t.has(value) ? t(value) : value);
   return (
     <>
-      <Heading title={t("clicks")} description={t("clicksDescription")} />
+      <Heading
+        title={t("clicks")}
+        description={t("clicksDescription")}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ApiGuide params={selection.params} />
+            <CsvDownload
+              key={queryString(selection.params)}
+              path="exports/clicks.csv"
+              params={selection.params}
+              filename="click-events"
+            />
+          </div>
+        }
+      />
+      <p className="mb-4 text-xs text-muted-foreground">{t("exportScope")}</p>
       <ReportFilters
         onApply={(value) => {
           setSelection(value);

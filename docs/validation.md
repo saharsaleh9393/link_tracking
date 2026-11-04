@@ -46,3 +46,13 @@ Branch: `feat/nextjs-admin-ui`, based on `feat/streamlit-dashboard` at `2d99b74`
 - Initializer repeatability was verified: existing `.env.local` was preserved. Root `.env`, database volumes and generated artifacts are excluded from Git.
 
 Native Windows execution and remote production deployment remain unperformed. Exact Windows CMD setup/run commands are in README. CI has been updated with the same backend/frontend checks and browser workflows; a GitHub-hosted run is separate from this local evidence.
+
+## CSV, country lookup and reporting integrations — 2026-11-04
+
+- **62 Python tests passed**, including CSV/JSON equivalence, UTF-8 Persian text, formula neutralization, cursor export continuity, read-only catalog access, real MMDB parsing, IPv4/IPv6-mapped lookups, private IP rejection, trusted-proxy/header precedence and safe database installation/update behavior.
+- **8 frontend unit tests and 6 Chromium scenarios passed**. The report workflow downloaded 102 filtered click rows from three real CSV API pages, with one BOM/header and no visitor digest. Existing management, clipboard, language and authenticated-boundary scenarios also passed.
+- Frontend lint, TypeScript, optimized build, Prettier and Python Ruff checks passed. No schema migration was needed.
+- Country tests use the licensed synthetic MaxMind fixture under `tests/data`, not a production country database. Installation behavior is tested against compressed fixture bytes, including preservation of existing files and invalid replacements.
+- The official DB-IP production database download returned a proxy HTTP 403 in this managed cloud. It was not bypassed or installed. Users must run the documented installer on their computer or supply an authorized compatible country MMDB, then restart the API. Local/private IPs and historical unknown events remain unknown by design.
+
+See `docs/reporting-api.md` for read-only API examples, export limits, country setup and attribution.

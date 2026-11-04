@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     destination_allowed_hosts: str = ""
     trusted_proxy_cidrs: str = ""
     country_header: str = ""
+    geoip_database_path: str = ".local/geoip/country.mmdb"
     link_cache_ttl_seconds: float = Field(2, ge=0, le=60)
     link_cache_max_size: int = Field(10000, ge=1, le=100000)
     raw_retention_days: int = Field(90, ge=1)

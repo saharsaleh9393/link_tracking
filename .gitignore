@@ -17,3 +17,6 @@ web/*.tsbuildinfo
 web/next-env.d.ts
 web/playwright-report/
 web/test-results/
+*.mmdb
+*.mmdb.gz
+!tests/data/GeoIP2-Country-Test.mmdb

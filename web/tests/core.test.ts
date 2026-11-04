@@ -46,6 +46,9 @@ describe("API boundary", () => {
     vi.unstubAllEnvs();
   });
   it("restricts forwarding to explicit backend routes", () => {
+    expect(allowedRoute("exports/clicks.csv", "GET")).toBe(true);
+    expect(allowedRoute("reporting/links", "GET")).toBe(true);
+    expect(allowedRoute("exports/clicks.csv", "POST")).toBe(false);
     expect(allowedRoute("links", "POST")).toBe(true);
     expect(allowedRoute("analytics/summary", "GET")).toBe(true);
     for (const path of [
@@ -58,6 +61,30 @@ describe("API boundary", () => {
     ])
       expect(allowedRoute(path, "GET")).toBe(false);
     expect(allowedRoute("analytics/summary", "DELETE")).toBe(false);
+  });
+  it("forwards CSV continuation metadata using the read-only key", async () => {
+    vi.stubEnv("REPORT_API_KEY", "test-report-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("\ufeffclick_id\r\n123\r\n", {
+            headers: {
+              "Content-Type": "text/csv",
+              "X-Export-Row-Count": "1",
+              "X-Next-Cursor": "opaque-cursor",
+            },
+          }),
+      ),
+    );
+    const response = await backend(
+      "exports/clicks.csv",
+      "GET",
+      new URLSearchParams(),
+    );
+    expect(new TextDecoder().decode(response.csv)).toContain("click_id");
+    expect(response.csvHeaders?.["X-Next-Cursor"]).toBe("opaque-cursor");
+    expect(response.csvHeaders?.["X-Export-Row-Count"]).toBe("1");
   });
   it("requires exact same-origin writes", () => {
     expect(

@@ -102,6 +102,16 @@ The previous Streamlit implementation is preserved on `feat/streamlit-dashboard`
 
 ## Verification
 
+CSV exports are available in **Click Reports** and **Traffic Analytics**, with the applied filters and all pages (up to 50,000 rows per browser download). Files support Persian text in Excel. A dedicated read-only API supports larger incremental reporting integrations; use the **Reporting API guide** button or [API examples](docs/reporting-api.md).
+
+For country lookup, install a local country database from the repository root, then restart FastAPI:
+
+```bat
+.venv\Scripts\python.exe scripts\install_geoip.py
+```
+
+Local/private IPs still have no reliable country; historical unknown countries cannot be recovered because raw IPs were never stored. [Country setup, updates and attribution](docs/reporting-api.md#country-lookup) explains the official free DB-IP download and trusted-proxy alternative. The actual country database is not committed to Git.
+
 Python tests require a **disposable** database named `tracker_test`; they truncate its contents:
 
 ```bat

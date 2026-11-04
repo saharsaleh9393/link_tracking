@@ -29,6 +29,11 @@ async function handle(request: Request, context: Context) {
     );
   if (result.status === 204)
     return new NextResponse(null, { status: 204, headers });
+  if (result.csv)
+    return new NextResponse(result.csv, {
+      status: result.status,
+      headers: { ...headers, ...result.csvHeaders },
+    });
   return NextResponse.json(
     result.total !== null
       ? { items: result.data, total: Number(result.total) }

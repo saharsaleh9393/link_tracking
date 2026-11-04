@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useResource } from "@/lib/client";
+import { useResource, queryString } from "@/lib/client";
 import { initialRange, reportRange } from "@/lib/utils";
 import type {
   Breakdown,
@@ -18,6 +18,8 @@ import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import { ReportFilters, type ReportSelection } from "../report-filters";
 import { Chart } from "../charts";
+import { CsvDownload } from "../csv-download";
+import { CountryNotice } from "../reporting-help";
 function initial() {
   const range = initialRange();
   return {
@@ -107,7 +109,19 @@ export function AnalyticsView() {
   }
   return (
     <>
-      <Heading title={t("analytics")} description={t("analyticsDescription")} />
+      <Heading
+        title={t("analytics")}
+        description={t("analyticsDescription")}
+        action={
+          <CsvDownload
+            key={queryString({ ...selection.params, granularity: interval })}
+            path="analytics/trends.csv"
+            params={{ ...selection.params, granularity: interval }}
+            label="exportTrends"
+            filename="click-trends"
+          />
+        }
+      />
       <ReportFilters
         onApply={(value) => {
           setSelection(value);
@@ -198,6 +212,17 @@ export function AnalyticsView() {
             {t("limitedChart", { count: 1000 })}
           </p>
         )}
+      {dimension === "country" && <CountryNotice />}
+      <div className="my-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">{t("exportScope")}</p>
+        <CsvDownload
+          key={queryString({ ...selection.params, dimension })}
+          path="analytics/breakdowns.csv"
+          params={{ ...selection.params, dimension }}
+          label="exportBreakdown"
+          filename="traffic-breakdown"
+        />
+      </div>
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[280px_1fr]">
         <Card>
           <CardContent>

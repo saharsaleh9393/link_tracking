@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 const password = "e2e-workspace-password-strong-and-local";
 const backend = process.env.E2E_TRACKER_API_URL || "http://127.0.0.1:8003";
 const headers = { Authorization: "Bearer e2e-admin-" + "a".repeat(40) };
@@ -269,7 +270,7 @@ test("mobile RTL navigation and report filters survive language changes", async 
 test("click report cursor pagination is preserved through the authenticated UI", async ({
   page,
   request,
-}) => {
+}, testInfo) => {
   const created = await request.post(backend + "/api/v1/links", {
     headers,
     data: {
@@ -299,4 +300,19 @@ test("click report cursor pagination is preserved through the authenticated UI",
   await expect(page.locator("tbody tr")).toHaveCount(2);
   await page.getByRole("button", { name: "Previous", exact: true }).click();
   await expect(page.locator("tbody tr")).toHaveCount(100);
+  await page.route("**/api/tracker/exports/clicks.csv?**", (route) => {
+    const url = new URL(route.request().url());
+    url.searchParams.set("limit", "50");
+    return route.continue({ url: url.toString() });
+  });
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export CSV", exact: true }).click();
+  const download = await downloaded;
+  const target = testInfo.outputPath("click-export.csv");
+  await download.saveAs(target);
+  const exported = await readFile(target, "utf8");
+  expect(exported.charCodeAt(0)).toBe(0xfeff);
+  expect(exported.split("\r\n").filter(Boolean)).toHaveLength(103);
+  expect(exported.match(/occurred_at/g)).toHaveLength(1);
+  expect(exported).not.toContain("visitor_digest");
 });
