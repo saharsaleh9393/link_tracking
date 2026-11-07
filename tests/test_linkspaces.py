@@ -352,3 +352,99 @@ def test_migration_normalizes_seeded_configuration_for_uniqueness(client, admin,
         assert duplicate.status_code == 409
     finally:
         command.upgrade(config, "head")
+
+
+def test_localhost_subdomain_demo_works_across_campaigns_without_root_env(
+    client, admin, new_link, database
+):
+    space = create_space(
+        client,
+        admin,
+        name="Local demo",
+        base_url="http://go.localhost:8000",
+        path_prefix="",
+        is_default=True,
+    )
+    assert space["configuration_status"] == "local_development"
+    assert space["preview_url"] == "http://go.localhost:8000/slug"
+    for name in ("Campaign A", "Campaign B"):
+        campaign = client.post("/api/v1/campaigns", headers=admin, json={"name": name}).json()
+        link = new_link(campaign_id=campaign["id"])
+        assert link["linkspace_id"] == space["id"]
+        assert link["tracking_url"] == "http://go.localhost:8000/" + link["slug"]
+        assert client.get(link["tracking_url"]).status_code == 302
+        assert client.head(link["tracking_url"]).status_code == 302
+        assert client.get("http://other.localhost:8000/" + link["slug"]).status_code == 404
+        assert client.get("http://go.localhost:3000/" + link["slug"]).status_code == 404
+    with database.connect() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM click_events")) == 2
+    assert client.get("http://go.localhost:8000/health/live").json() == {"status": "ok"}
+    reserved = client.post(
+        "/api/v1/links",
+        headers=admin,
+        json={"slug": "settings", "destination_url": "https://example.com"},
+    )
+    assert reserved.status_code == 422
+    assert reserved.json()["detail"]["code"] == "LINKSPACE_RESERVED_SLUG"
+
+
+@pytest.mark.parametrize(
+    "base",
+    [
+        "http://go.localhost:3000",
+        "https://go.localhost:8000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://go.example.com",
+    ],
+)
+def test_demo_root_approval_does_not_extend_to_other_origins(client, admin, base):
+    response = client.post(
+        "/api/v1/linkspaces",
+        headers=admin,
+        json={"name": "Unsafe root", "base_url": base, "path_prefix": ""},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "LINKSPACE_ROOT_UNSAFE"
+
+
+@pytest.mark.parametrize(
+    "public_base", ["https://go.example.com", "http://127.0.0.1:8001", "http://192.168.1.5:8000"]
+)
+def test_local_demo_auto_approval_is_off_outside_local_api_origin(
+    client, admin, monkeypatch, public_base
+):
+    monkeypatch.setenv("PUBLIC_BASE_URL", public_base)
+    get_settings.cache_clear()
+    response = client.post(
+        "/api/v1/linkspaces",
+        headers=admin,
+        json={"name": "Local demo", "base_url": "http://go.localhost:8000", "path_prefix": ""},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "LINKSPACE_ROOT_UNSAFE"
+
+
+@pytest.mark.parametrize(
+    "base",
+    [
+        "http://go.localhost.evil.com:8000",
+        "http://notlocalhost:8000",
+        "http://bad_name.localhost:8000",
+        "http://a..localhost:8000",
+        "http://go.localhost:8000/slug",
+    ],
+)
+def test_demo_hostname_validation_cannot_be_bypassed(client, admin, base):
+    assert (
+        client.post(
+            "/api/v1/linkspaces",
+            headers=admin,
+            json={"name": "Invalid demo", "base_url": base, "path_prefix": "r"},
+        ).status_code
+        == 422
+    )
+
+
+def test_localhost_subdomain_normalization():
+    assert normalize_base("HTTP://GO.LOCALHOST:8000/") == "http://go.localhost:8000"

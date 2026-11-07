@@ -38,6 +38,15 @@ RESERVED = frozenset(
 )
 
 
+def is_loopback_host(host: str) -> bool:
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def normalize_base(value: str) -> str:
     value = value.strip()
     if any(c.isspace() or ord(c) < 32 for c in value) or any(c in value for c in "\\%?#"):
@@ -65,8 +74,8 @@ def normalize_base(value: str) -> str:
         local = address.is_loopback
         host = f"[{address.compressed}]" if address.version == 6 else address.compressed
     except ValueError:
-        local = host == "localhost"
-        if not local and (
+        local = is_loopback_host(host)
+        if host != "localhost" and (
             len(host) > 253
             or "." not in host
             or any(
@@ -76,7 +85,9 @@ def normalize_base(value: str) -> str:
         ):
             raise ValueError("Use a valid domain, IP address or localhost") from None
     if url.scheme == "http" and not local:
-        raise ValueError("Public link domains require HTTPS; HTTP is allowed for localhost only")
+        raise ValueError(
+            "Public link domains require HTTPS; HTTP is allowed for loopback and .localhost only"
+        )
     port_suffix = f":{port}" if port and port != (443 if url.scheme == "https" else 80) else ""
     return f"{url.scheme}://{host}{port_suffix}"
 
@@ -103,15 +114,33 @@ def origins(value: str) -> set[str]:
     return result
 
 
+def local_demo_origin(base_url: str) -> bool:
+    """A local API port is separate from the dashboard; no DNS resolution is needed here."""
+    try:
+        url = urlsplit(normalize_base(base_url))
+        public = urlsplit(normalize_base(get_settings().public_base_url))
+        return (
+            url.scheme == public.scheme == "http"
+            and is_loopback_host(url.hostname or "")
+            and is_loopback_host(public.hostname or "")
+            and (url.port or 80) == (public.port or 80)
+        )
+    except ValueError:
+        return False
+
+
 def root_allowed(base_url: str) -> bool:
-    return base_url in origins(get_settings().linkspace_root_origins)
+    # Auto-approval is limited to a dedicated .localhost hostname on the local API port.
+    # Public deployments and bare localhost/IP roots still require operator approval.
+    demo = local_demo_origin(base_url) and (urlsplit(base_url).hostname or "").endswith(
+        ".localhost"
+    )
+    return demo or base_url in origins(get_settings().linkspace_root_origins)
 
 
 def configuration_status(base_url: str) -> str:
     settings = get_settings()
-    url = urlsplit(base_url)
-    public = urlsplit(settings.public_base_url)
-    if url.hostname in {"localhost", "127.0.0.1", "::1"} and url.port == public.port:
+    if local_demo_origin(base_url):
         return "local_development"
     if base_url in origins(settings.linkspace_routed_origins):
         return "operator_configured"

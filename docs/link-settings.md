@@ -37,9 +37,26 @@ npm run dev
 
 For an optimized frontend, replace `npm run dev` with `npm run build` followed by `npm run start`. No new dependencies or credentials are needed for this feature. Settings and URLs are owned by FastAPI/PostgreSQL; the browser receives no API keys.
 
+## Local demo with `go.localhost`
+
+With FastAPI on port 8000 and backend `PUBLIC_BASE_URL=http://127.0.0.1:8000`, create:
+
+| Field | Value |
+|---|---|
+| Name | Local demo |
+| Base URL | `http://go.localhost:8000` (without `/slug`) |
+| Path prefix | Empty |
+| Active / Default | Enabled |
+
+This creates URLs such as `http://go.localhost:8000/launch` for new links in **any campaign**. Use the actual API port, not the dashboard's port 3000. No migration or `LINKSPACE_ROOT_ORIGINS` change is needed for this dedicated local hostname. The local-demo label means development on this computer, not public DNS/TLS readiness.
+
+Modern browsers resolve `.localhost` names to loopback. If your Windows resolver does not, add `127.0.0.1 go.localhost` to `C:\Windows\System32\drivers\etc\hosts` using an administrator editor. Keep FastAPI bound to `127.0.0.1`; don't edit DNS, expose it to the LAN or change real server settings for this demonstration. Anyone opening this URL on another computer targets **their own** localhost.
+
+Automatic root approval is deliberately limited to valid HTTP `.localhost` subdomains on the same effective port as a loopback backend `PUBLIC_BASE_URL`. Bare localhost/IP roots, different ports, HTTPS localhost roots and public domains retain the explicit approval requirement. When moving to production, set `PUBLIC_BASE_URL` to the real public origin; automatic demo approval then stops. Test URLs are not rewritten into public URLs: create a production Linkspace and use it for new links. Domain/prefix validation errors are localized separately, without exposing submitted values.
+
 ## Manual domain and routing setup (no deployment performed)
 
-Custom origins require **HTTPS**; HTTP is permitted for localhost and loopback development. Credentials, URL paths, queries, fragments, wildcards and invalid ports are rejected. Prefixes normalize to lowercase, without surrounding slashes. Use one segment such as `r`, `go` or `visit`. Application paths such as `api`, `health`, `docs`, `settings`, `login`, `_next` and dashboard navigation paths are reserved. Normalized `(base_url, path_prefix)` is unique in PostgreSQL. A partial unique index, active-default check and transaction locks protect concurrent default changes and link creation.
+Custom origins require **HTTPS**; HTTP is permitted for localhost, its subdomains and loopback development. Credentials, URL paths, queries, fragments, wildcards and invalid ports are rejected. Prefixes normalize to lowercase, without surrounding slashes. Use one segment such as `r`, `go` or `visit`. Application paths such as `api`, `health`, `docs`, `settings`, `login`, `_next` and dashboard navigation paths are reserved. Normalized `(base_url, path_prefix)` is unique in PostgreSQL. A partial unique index, active-default check and transaction locks protect concurrent default changes and link creation.
 
 For each real domain, the server operator must separately:
 
@@ -48,7 +65,7 @@ For each real domain, the server operator must separately:
 3. Test the generated URL, destination query preservation, HEAD behavior and recorded clicks from outside the server. No application request probes DNS or external services.
 4. Only after this setup is complete, add the exact origin to backend `LINKSPACE_ROUTED_ORIGINS` (comma-separated), then restart FastAPI. The UI labels this **Configured by server operator — not automatically verified**. Otherwise a custom domain remains **Pending DNS / HTTPS / proxy setup**. This is an operator attestation, not an automatic DNS/certificate check.
 
-For prefixless links (`https://go.example.com/slug`), first confirm that the origin is dedicated to redirects and has no competing site/application routes. Then explicitly add it to backend `LINKSPACE_ROOT_ORIGINS` and restart FastAPI before creating a Linkspace with an empty prefix. Without that approval the API returns `LINKSPACE_ROOT_UNSAFE` and the UI explains the required action. `LINKSPACE_ROUTED_ORIGINS` additionally controls the production configuration label; root approval alone does not claim DNS/HTTPS is ready. For an isolated local API origin, an operator can approve e.g. `http://127.0.0.1:8000` for development.
+Except for the dedicated local-demo rule above, for prefixless links (`https://go.example.com/slug`), first confirm that the origin is dedicated to redirects and has no competing site/application routes. Then explicitly add it to backend `LINKSPACE_ROOT_ORIGINS` and restart FastAPI before creating a Linkspace with an empty prefix. Without that approval the API returns `LINKSPACE_ROOT_UNSAFE` and the UI explains the required action. `LINKSPACE_ROUTED_ORIGINS` additionally controls the production configuration label; root approval alone does not claim DNS/HTTPS is ready. For an isolated local API origin, an operator can approve e.g. `http://127.0.0.1:8000` for development.
 
 The catch-all is registered after explicit FastAPI routes. It accepts only the link's snapshotted origin/path/slug and checks root approval on every root request, without an additional database query on cache hits. It does not trust `X-Forwarded-Host`. Unknown paths and mismatched hosts return 404. `/r/{slug}` remains an unconditional compatibility alias using the original tracking engine. Slugs remain globally unique across Linkspaces. Disabling a link still disables every alias.
 

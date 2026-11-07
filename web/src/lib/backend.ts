@@ -116,6 +116,25 @@ export async function backend(
         path === "links"
       ) {
         const detail = await response.json().catch(() => null);
+        if (
+          response.status === 422 &&
+          (path === "linkspaces" || path.startsWith("linkspaces/")) &&
+          Array.isArray(detail?.detail)
+        ) {
+          const fields: Record<string, string> = {
+            name: "LINKSPACE_NAME",
+            base_url: "LINKSPACE_URL",
+            path_prefix: "LINKSPACE_PREFIX",
+          };
+          const field = detail.detail.find(
+            (item: { loc?: unknown[] }) =>
+              Array.isArray(item?.loc) &&
+              item.loc[0] === "body" &&
+              typeof item.loc[1] === "string" &&
+              Object.hasOwn(fields, item.loc[1]),
+          )?.loc[1];
+          if (field) return { error: fields[field], status: 422 };
+        }
         const code = detail?.detail?.code;
         if (
           [

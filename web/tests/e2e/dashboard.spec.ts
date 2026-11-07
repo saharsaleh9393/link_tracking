@@ -1,6 +1,145 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+
+test("localhost demo supports root URLs, real redirects and specific validation", async ({
+  page,
+  request,
+}) => {
+  const keys = ["name", "base_url", "path_prefix", "is_active", "is_default"];
+  const original = (
+    await (
+      await request.get(backend + "/api/v1/linkspaces", { headers })
+    ).json()
+  ).find((space: { is_default: boolean }) => space.is_default);
+  const origin = new URL(backend);
+  origin.hostname = "demo-" + unique() + ".localhost";
+  const demoBase = origin.origin,
+    name = "Local demo " + unique();
+  let spaceId = "";
+  try {
+    await login(page);
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Link Settings", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Create Linkspace", exact: true })
+      .click();
+    await page.getByLabel("Linkspace name", { exact: true }).fill(name);
+    await page
+      .getByLabel("Base URL / domain", { exact: true })
+      .fill(demoBase + "/slug");
+    await page
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+      "without /slug",
+    );
+    await page.getByLabel("Base URL / domain", { exact: true }).fill(demoBase);
+    await page.getByLabel("Path prefix", { exact: true }).fill("_next");
+    await page
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+      "reserved paths",
+    );
+    await page.getByLabel("Path prefix", { exact: true }).fill("");
+    await page.getByLabel("Default", { exact: true }).check();
+    await page
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: name })).toContainText(
+      "Local development",
+    );
+    const spaces = await (
+      await request.get(backend + "/api/v1/linkspaces", { headers })
+    ).json();
+    spaceId = spaces.find((space: { name: string }) => space.name === name).id;
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Links", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Create tracking link", exact: true })
+      .click();
+    const slug = "local-demo-" + unique();
+    const url = demoBase + "/" + slug;
+    await page.getByLabel("Custom slug (optional)", { exact: true }).fill(slug);
+    await page
+      .getByLabel("Destination URL", { exact: true })
+      .fill("https://example.com/demo?signature=a%2Fb");
+    await expect(page.getByRole("dialog").locator("code")).toHaveText(url);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Create tracking link", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const row = page.getByRole("row").filter({ hasText: slug });
+    await expect(row.locator("code")).toHaveText(url);
+    await page
+      .context()
+      .grantPermissions(["clipboard-read", "clipboard-write"]);
+    await row
+      .getByRole("button", { name: "Copy tracking URL", exact: true })
+      .click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(url);
+    const visitor = await page.context().newPage();
+    try {
+      // Stub only the external destination through Chromium, without routing the
+      // loopback hostname through Playwright's interception proxy.
+      const cdp = await page.context().newCDPSession(visitor);
+      await cdp.send("Fetch.enable", {
+        patterns: [{ urlPattern: "https://example.com/*" }],
+      });
+      cdp.on("Fetch.requestPaused", async ({ requestId }) => {
+        await cdp.send("Fetch.fulfillRequest", {
+          requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: "Content-Type", value: "text/plain" }],
+          body: Buffer.from("Local demo destination").toString("base64"),
+        });
+      });
+      const redirected = visitor.waitForResponse(
+        (response) => response.url() === url && response.status() === 302,
+      );
+      await visitor.goto(url);
+      await redirected;
+      await expect(visitor).toHaveURL(
+        "https://example.com/demo?signature=a%2Fb",
+      );
+      await expect(visitor.locator("body")).toHaveText(
+        "Local demo destination",
+      );
+    } finally {
+      await visitor.close();
+    }
+  } finally {
+    const values = Object.fromEntries(keys.map((key) => [key, original[key]]));
+    expect(
+      (
+        await request.put(backend + "/api/v1/linkspaces/" + original.id, {
+          headers,
+          data: { ...values, is_default: true },
+        })
+      ).status(),
+    ).toBe(200);
+    if (spaceId) {
+      const spaces = await (
+        await request.get(backend + "/api/v1/linkspaces", { headers })
+      ).json();
+      const space = spaces.find((item: { id: string }) => item.id === spaceId);
+      const fields = Object.fromEntries(keys.map((key) => [key, space[key]]));
+      await request.put(backend + "/api/v1/linkspaces/" + spaceId, {
+        headers,
+        data: { ...fields, is_default: false, is_active: false },
+      });
+    }
+  }
+});
 const password = "e2e-workspace-password-strong-and-local";
 const backend = process.env.E2E_TRACKER_API_URL || "http://127.0.0.1:8003";
 const headers = { Authorization: "Bearer e2e-admin-" + "a".repeat(40) };
@@ -89,9 +228,21 @@ test("campaign autocomplete is explicit, keyboard accessible, clearable; duplica
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("cell", { name, exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
-  await search.fill(name.slice(0, -1).toUpperCase());
-  await expect(page.getByRole("option").first()).toBeVisible();
+  const term = name.slice(0, -1).toUpperCase();
+  const suggestions = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname === "/api/tracker/campaigns" &&
+      url.searchParams.get("q") === term &&
+      response.ok()
+    );
+  });
+  await search.fill(term);
+  await suggestions;
   await search.press("ArrowDown");
+  await expect(
+    page.getByRole("listbox").getByRole("option").first(),
+  ).toBeVisible();
   await search.press("Enter");
   await expect(page.getByRole("cell", { name, exact: true })).toBeVisible();
 });

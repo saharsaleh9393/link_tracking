@@ -244,6 +244,41 @@ describe("API boundary", () => {
       await backend("linkspaces", "POST", new URLSearchParams(), "{}"),
     ).toEqual({ error: "VALIDATION", status: 422 });
   });
+  it.each([
+    ["base_url", "LINKSPACE_URL"],
+    ["path_prefix", "LINKSPACE_PREFIX"],
+    ["name", "LINKSPACE_NAME"],
+  ])(
+    "explains Linkspace %s validation without leaking submitted input",
+    async (field, code) => {
+      vi.stubEnv("ADMIN_API_KEY", "admin-secret");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json(
+            {
+              detail: [
+                {
+                  loc: ["body", field],
+                  msg: "PRIVATE submitted input",
+                  input: "PRIVATE",
+                },
+              ],
+            },
+            { status: 422 },
+          ),
+        ),
+      );
+      const result = await backend(
+        "linkspaces",
+        "POST",
+        new URLSearchParams(),
+        "{}",
+      );
+      expect(result).toEqual({ error: code, status: 422 });
+      expect(JSON.stringify(result)).not.toContain("PRIVATE");
+    },
+  );
 });
 it("previews root and prefixed Linkspace URLs consistently", () => {
   expect(linkPreview("https://go.example.com/", "")).toBe(

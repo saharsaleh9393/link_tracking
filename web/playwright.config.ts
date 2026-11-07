@@ -13,7 +13,12 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
-      args: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? ["--no-sandbox"] : [],
+      // Only special-use loopback names bypass the environment's outbound proxy.
+      args: [
+        "--host-resolver-rules=MAP *.localhost 127.0.0.1",
+        "--proxy-bypass-list=localhost;*.localhost;127.0.0.1;[::1]",
+        ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? ["--no-sandbox"] : []),
+      ],
     },
   },
   webServer: {

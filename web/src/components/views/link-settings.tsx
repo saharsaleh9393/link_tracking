@@ -171,6 +171,9 @@ function ConfigurationForm({
       <p className="text-xs text-muted-foreground">
         {t("linkspaceSnapshotHint")}
       </p>
+      <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-6">
+        {t("linkspaceLocalDemoHint")}
+      </p>
       <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
         {t("linkspaceDeploymentHint")}
       </p>
