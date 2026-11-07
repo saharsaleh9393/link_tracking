@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     app_env: Literal["development", "simulation", "production"] = "development"
     http_allowed_hosts: str = ""
     dashboard_origin: str = ""
+    dashboard_login_client_limit: int = Field(10, ge=1, le=1000)
+    dashboard_login_account_limit: int = Field(100, ge=1, le=10000)
+    dashboard_login_window_seconds: int = Field(60, ge=1, le=3600)
 
     database_url: str = "postgresql+psycopg://tracker:tracker_local_only@127.0.0.1:5432/tracker"
     admin_api_key: SecretStr

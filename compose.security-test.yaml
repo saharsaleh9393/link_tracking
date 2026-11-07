@@ -1,0 +1,41 @@
+# Use ONLY a new project/env/database created specifically for these tests.
+services:
+  db:
+    ports: !override
+      - 127.0.0.1:55439:5432
+  api:
+    image: linkspace-api:security-fix
+    environment:
+      DASHBOARD_LOGIN_CLIENT_LIMIT: 4
+      DASHBOARD_LOGIN_ACCOUNT_LIMIT: 20
+      DASHBOARD_LOGIN_WINDOW_SECONDS: 4
+  migrate:
+    image: linkspace-api:security-fix
+  worker:
+    image: linkspace-api:security-fix
+  web:
+    image: linkspace-web:security-fix
+  web2:
+    extends:
+      file: compose.production.yaml
+      service: web
+    image: linkspace-web:security-fix
+    tmpfs: !override
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /app/.next/cache:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+  proxy:
+    environment:
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,web2,db
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,web2,db
+    volumes:
+      - ./tests/security/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      web2: {condition: service_healthy}
+  client_a:
+    image: linkspace-api:security-fix
+    command: [python, -c, "import time; time.sleep(3600)"]
+    networks: [edge]
+    read_only: true
+    cap_drop: [ALL]
+  client_b:
+    extends: client_a

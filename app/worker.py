@@ -142,6 +142,13 @@ def run_once():
     ensure_partitions()
     aggregate()
     purge_expired()
+    from sqlalchemy.orm import Session
+
+    from app.dashboard_auth import cleanup_auth
+
+    with Session(get_engine()) as session:
+        cleanup_auth(session)
+        session.commit()
 
 
 def main():

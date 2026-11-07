@@ -24,6 +24,19 @@ class Base(DeclarativeBase):
     pass
 
 
+class DashboardSession(Base):
+    __tablename__ = "dashboard_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class DashboardLoginBucket(Base):
+    __tablename__ = "dashboard_login_buckets"
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    attempts: Mapped[int] = mapped_column(Integer)
+    resets_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class UTMMixin:
     utm_source: Mapped[str | None] = mapped_column(String(200))
     utm_medium: Mapped[str | None] = mapped_column(String(200))

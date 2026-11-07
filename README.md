@@ -137,3 +137,5 @@ npm run build
 ```
 
 [Browser-test instructions and security contracts](docs/web-dashboard.md) · [Backend architecture](docs/architecture.md) · [Operations](docs/operations.md) · [Validation evidence](docs/validation.md).
+
+Dashboard authentication uses shared PostgreSQL sessions and rate limits. Existing Docker installations must follow [the authentication security update](docs/security-auth.md) to add the ingress secret and migrate safely.

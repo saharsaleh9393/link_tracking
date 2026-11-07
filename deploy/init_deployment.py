@@ -51,6 +51,7 @@ def initialize(
             "visitor_hmac_key",
             "dashboard_password",
             "dashboard_session_secret",
+            "dashboard_proxy_secret",
         )
     }
     values["owner_database_url"] = (
@@ -66,7 +67,14 @@ def initialize(
     (root / ".local" / "backups").chmod(0o700)
     # These bind-mounted files contain no secrets and must be readable by the
     # postgres/Caddy container identities even under a restrictive host umask.
-    for name in ("Caddyfile", "Caddyfile.local", "routes.caddy", "postgres-init.sh", "database.sh"):
+    for name in (
+        "Caddyfile",
+        "Caddyfile.local",
+        "routes.caddy",
+        "postgres-init.sh",
+        "database.sh",
+        "proxy-entrypoint.sh",
+    ):
         path = root / "deploy" / name
         if path.is_file():
             path.chmod(0o644)

@@ -9,7 +9,7 @@
 }
 import /etc/caddy/routes.caddy
 {$DASHBOARD_SITE} {
-    import dashboard
+    import dashboard web:3000
 }
 {$TRACKING_SITES} {
     import tracking

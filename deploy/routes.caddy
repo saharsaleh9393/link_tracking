@@ -27,11 +27,13 @@
         import api_proxy
     }
     handle {
-        reverse_proxy web:3000 {
+        reverse_proxy {args[0]} {
             header_up Host {http.request.hostport}
             header_up X-Forwarded-Host {http.request.host}
             header_up X-Forwarded-Proto {http.request.scheme}
             header_up X-Forwarded-For {http.request.remote.host}
+            header_up X-Linkspace-Client-IP {http.request.remote.host}
+            header_up X-Linkspace-Proxy-Token {env.DASHBOARD_PROXY_SECRET}
             header_up -Forwarded
         }
     }

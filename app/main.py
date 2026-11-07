@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.csv_exports import router as csv_router
+from app.dashboard_auth import router as dashboard_auth_router
 from app.db import get_engine, session_dependency
 from app.links import resolve_link
 from app.links import router as management_router
@@ -44,6 +45,7 @@ app.include_router(linkspace_router)
 app.include_router(reporting_router)
 app.include_router(csv_router)
 app.include_router(reporting_access_router)
+app.include_router(dashboard_auth_router)
 app.add_middleware(ConfiguredTrustedHosts)
 
 
@@ -90,7 +92,7 @@ def live():
 @app.get("/health/ready", tags=["Operations"])
 def ready(session: Session = Depends(session_dependency)):
     revision = session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
-    if revision != "0003":
+    if revision != "0004":
         raise HTTPException(503, "Database migration required")
     partition = session.scalar(
         text("SELECT to_regclass(:name)"), {"name": f"click_events_{datetime.now(UTC):%Y_%m}"}

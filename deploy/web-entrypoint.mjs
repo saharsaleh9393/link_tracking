@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 try {
-  for (const key of ["ADMIN_API_KEY", "REPORT_API_KEY", "DASHBOARD_PASSWORD", "DASHBOARD_SESSION_SECRET"]) {
+  for (const key of ["ADMIN_API_KEY", "REPORT_API_KEY", "DASHBOARD_PASSWORD", "DASHBOARD_SESSION_SECRET", "DASHBOARD_PROXY_SECRET"]) {
     if (process.env[key + "_FILE"]) {
       if (process.env[key]) throw Error("Ambiguous secret");
       process.env[key] = readFileSync(process.env[key + "_FILE"], "utf8").trim();

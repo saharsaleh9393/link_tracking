@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { LanguageSwitch } from "./language-switch";
+import { ErrorNotice } from "./shared";
 import { cn } from "@/lib/utils";
 const nav = [
   ["overview", LayoutDashboard],
@@ -34,6 +35,7 @@ export function Shell({ children }: { children: ReactNode }) {
     path = usePathname(),
     router = useRouter();
   const [open, setOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const current = path.startsWith("/settings")
     ? "linkSettings"
     : nav.find(([key]) => path.startsWith("/" + key))?.[0] || "overview";
@@ -162,7 +164,18 @@ export function Shell({ children }: { children: ReactNode }) {
               title={t("signOut")}
               aria-label={t("signOut")}
               onClick={async () => {
-                await fetch("/api/auth", { method: "DELETE" });
+                try {
+                  const response = await fetch("/api/auth", {
+                    method: "DELETE",
+                  });
+                  if (!response.ok) {
+                    setLogoutError("UNAVAILABLE");
+                    return;
+                  }
+                } catch {
+                  setLogoutError("UNAVAILABLE");
+                  return;
+                }
                 router.replace("/login");
                 router.refresh();
               }}
@@ -176,6 +189,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="mx-auto max-w-[1600px] p-4 sm:p-8 lg:p-9">
+          <ErrorNotice code={logoutError} />
           {children}
         </main>
         <footer className="flex items-center justify-between px-8 pb-6 text-[11px] text-slate-400">

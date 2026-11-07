@@ -1,6 +1,6 @@
 # Container deployment and Windows production simulation
 
-This is a single-server Docker Compose deployment. It reuses FastAPI, Next.js, PostgreSQL 17, the worker and migration `0003`. No server was accessed, DNS changed, existing development environment overwritten or real HTTPS certificate issued while preparing it. Inspect the target OS, architecture, RAM/disk, existing services, occupied ports, Docker support, firewall, DNS and backup ownership **before choosing server commands**. Review existing proxy/service configuration before installation; never replace it blindly.
+This is a single-server Docker Compose deployment. It reuses FastAPI, Next.js, PostgreSQL 17, the worker and migration `0004`. No server was accessed, DNS changed, existing development environment overwritten or real HTTPS certificate issued while preparing it. Inspect the target OS, architecture, RAM/disk, existing services, occupied ports, Docker support, firewall, DNS and backup ownership **before choosing server commands**. Review existing proxy/service configuration before installation; never replace it blindly.
 
 ## Layout and boundaries
 
@@ -159,3 +159,5 @@ Managed cloud builds may need a combined CA passed as BuildKit secret `proxy_ca`
 Optional GeoIP files are non-secret but must be readable by the API UID (10001): make the mounted directory traversable and country.mmdb readable. Keep secret directories owner-only; do not apply GeoIP permissions to secrets.
 
 For an upgrade from a pre-0003 database whose issued URLs used HTTP, preserve that original origin during the one-time snapshot migration. An explicitly reviewed migration invocation can override `APP_ENV=development` and `PUBLIC_BASE_URL` to the original HTTP value for that one-off owner job; do not relax the normal production services. Then use HTTPS production settings and select a new HTTPS Linkspace default. Keep legacy origins/proxy routes available, and test the process on a restored copy first.
+
+Dashboard session revocation and shared login throttling require the additive `0004` update and a new Caddy/web ingress secret. For an existing installation follow [the safe authentication update procedure](security-auth.md) before restarting the new release. Do not roll back to stateless-session images.

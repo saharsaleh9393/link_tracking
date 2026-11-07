@@ -39,7 +39,8 @@ export function signSession(secret: string, now = Date.now()) {
     createHmac("sha256", secret).update(payload).digest("base64url")
   );
 }
-export function validSession(
+// Signature/expiry verification is necessary but never sufficient for authorization.
+export function validSessionSignature(
   token: string | undefined,
   secret: string | undefined,
   now = Date.now(),
@@ -55,10 +56,15 @@ export function validSession(
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString());
     return (
       typeof decoded.expires === "number" &&
+      typeof decoded.nonce === "string" &&
+      /^[a-f0-9]{32}$/.test(decoded.nonce) &&
       decoded.expires > now &&
-      decoded.expires <= now + SESSION_SECONDS * 1000
+      decoded.expires <= now + SESSION_SECONDS * 1000 + 30_000
     );
   } catch {
     return false;
   }
+}
+export function sessionHash(token: string) {
+  return createHash("sha256").update(token).digest("hex");
 }

@@ -58,6 +58,11 @@ def grant_runtime_access():
     with get_engine().begin() as connection:
         connection.execute(text("GRANT USAGE ON SCHEMA public TO linkspace_app"))
         connection.execute(
+            text(
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON dashboard_sessions, dashboard_login_buckets TO linkspace_app"
+            )
+        )
+        connection.execute(
             text("GRANT SELECT, INSERT, UPDATE ON campaigns, links TO linkspace_app")
         )
         connection.execute(text("GRANT SELECT, INSERT ON link_destinations TO linkspace_app"))

@@ -324,7 +324,7 @@ def test_downgrade_refuses_to_discard_custom_origins(client, admin, new_link, da
     with pytest.raises(RuntimeError, match="discard custom URLs"):
         command.downgrade(Config("alembic.ini"), "0002")
     with database.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
     assert (
         client.get(f"/api/v1/links/{link['id']}", headers=admin).json()["tracking_url"]
         == link["tracking_url"]

@@ -5,7 +5,10 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ path: string[] }> };
 async function handle(request: Request, context: Context) {
   if (!(await authenticated()))
-    return NextResponse.json({ code: "AUTH" }, { status: 401 });
+    return NextResponse.json(
+      { code: "AUTH" },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   if (request.method !== "GET" && !sameOrigin(request))
     return NextResponse.json({ code: "FORBIDDEN" }, { status: 403 });
   const path = (await context.params).path.join("/");

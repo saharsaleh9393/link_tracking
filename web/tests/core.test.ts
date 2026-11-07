@@ -4,7 +4,7 @@ import fa from "../src/messages/fa.json";
 import {
   passwordMatches,
   signSession,
-  validSession,
+  validSessionSignature,
   SESSION_SECONDS,
 } from "../src/lib/session";
 import { allowedRoute, backend } from "../src/lib/backend";
@@ -28,13 +28,15 @@ describe("sessions", () => {
   it("signs, expires and rejects tampering", () => {
     const now = 1000000;
     const token = signSession(secret, now);
-    expect(validSession(token, secret, now + 1)).toBe(true);
-    expect(validSession(token, secret, now + SESSION_SECONDS * 1000)).toBe(
+    expect(validSessionSignature(token, secret, now + 1)).toBe(true);
+    expect(
+      validSessionSignature(token, secret, now + SESSION_SECONDS * 1000),
+    ).toBe(false);
+    expect(validSessionSignature(token + "x", secret, now)).toBe(false);
+    expect(validSessionSignature(token, "different".repeat(8), now)).toBe(
       false,
     );
-    expect(validSession(token + "x", secret, now)).toBe(false);
-    expect(validSession(token, "different".repeat(8), now)).toBe(false);
-    expect(validSession("invalid", secret, now)).toBe(false);
+    expect(validSessionSignature("invalid", secret, now)).toBe(false);
   });
   it("checks configured passwords without accepting placeholders", () => {
     expect(passwordMatches("a".repeat(24), "a".repeat(24))).toBe(true);

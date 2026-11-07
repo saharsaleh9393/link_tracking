@@ -1,11 +1,19 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, validSession } from "./session";
+import { SESSION_COOKIE, validSessionSignature, sessionHash } from "./session";
+import { authStore } from "./auth-store";
 export async function authenticated() {
-  return validSession(
-    (await cookies()).get(SESSION_COOKIE)?.value,
-    process.env.DASHBOARD_SESSION_SECRET,
-  );
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!validSessionSignature(token, process.env.DASHBOARD_SESSION_SECRET))
+    return false;
+  try {
+    const result = await authStore("validate", {
+      token_hash: sessionHash(token!),
+    });
+    return result.data.valid === true;
+  } catch {
+    return false;
+  } // Fail closed; never fall back to signature-only authorization.
 }
 export function sameOrigin(request: Request) {
   const url = new URL(request.url);

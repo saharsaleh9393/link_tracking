@@ -9,7 +9,7 @@
 }
 import /etc/caddy/routes.caddy
 {$DASHBOARD_SITE} {
-    import dashboard
+    import dashboard web:3000
     header Strict-Transport-Security "max-age=31536000"
 }
 {$TRACKING_SITES} {

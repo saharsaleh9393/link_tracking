@@ -47,7 +47,8 @@ def client(database):
     with database.begin() as connection:
         connection.execute(
             text("""TRUNCATE campaigns, links, link_destinations, click_events,
-            daily_link_stats, daily_campaign_stats, audit_events, aggregation_state, linkspaces CASCADE""")
+            daily_link_stats, daily_campaign_stats, audit_events, aggregation_state, linkspaces,
+            dashboard_sessions, dashboard_login_buckets CASCADE""")
         )
         connection.execute(
             text("""INSERT INTO linkspaces
