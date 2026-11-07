@@ -41,11 +41,17 @@ jobs:
         run: npm ci && npm run lint && npm run typecheck && npm test && npm run build
       - name: Start isolated browser-test backend
         env:
-          DATABASE_URL: postgresql+psycopg://tracker:tracker_local_only@127.0.0.1:5432/tracker_test
+          DATABASE_URL: postgresql+psycopg://tracker:tracker_local_only@127.0.0.1:5432/tracker_ui_test
+          PUBLIC_BASE_URL: http://127.0.0.1:8003
           ADMIN_API_KEY: e2e-admin-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           REPORT_API_KEY: e2e-report-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
           VISITOR_HMAC_KEY: e2e-visitor-cccccccccccccccccccccccccccccccccccccccc
         run: |
+          python - <<'PY'
+          import psycopg
+          with psycopg.connect('postgresql://tracker:tracker_local_only@127.0.0.1:5432/postgres', autocommit=True) as connection:
+              connection.execute('CREATE DATABASE tracker_ui_test')
+          PY
           alembic upgrade head
           python -m uvicorn app.main:app --host 127.0.0.1 --port 8003 --no-access-log --no-proxy-headers > /tmp/tracker-e2e.log 2>&1 &
           python - <<'PY'
