@@ -15,6 +15,7 @@ import {
   Megaphone,
   MousePointerClick,
   ShieldCheck,
+  Settings,
   X,
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -33,8 +34,9 @@ export function Shell({ children }: { children: ReactNode }) {
     path = usePathname(),
     router = useRouter();
   const [open, setOpen] = useState(false);
-  const current =
-    nav.find(([key]) => path.startsWith("/" + key))?.[0] || "overview";
+  const current = path.startsWith("/settings")
+    ? "linkSettings"
+    : nav.find(([key]) => path.startsWith("/" + key))?.[0] || "overview";
   return (
     <div className="min-h-screen">
       <div
@@ -107,6 +109,23 @@ export function Shell({ children }: { children: ReactNode }) {
               )}
             </Link>
           ))}
+          <p className="px-3 pt-6 pb-2 text-[10px] font-semibold text-slate-400 uppercase">
+            {t("settings")}
+          </p>
+          <Link
+            href="/settings/links"
+            onClick={() => setOpen(false)}
+            aria-current={current === "linkSettings" ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] font-medium",
+              current === "linkSettings"
+                ? "bg-primary/8 text-primary"
+                : "text-slate-500 hover:bg-muted",
+            )}
+          >
+            <Settings className="size-[18px]" />
+            {t("linkSettings")}
+          </Link>
         </nav>
         <div className="mx-5 mt-auto mb-6 rounded-xl border border-primary/10 bg-gradient-to-br from-indigo-50 to-white p-4">
           <ShieldCheck className="mb-3 size-5 text-primary" />

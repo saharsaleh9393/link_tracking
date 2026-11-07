@@ -15,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -66,6 +67,9 @@ class Link(UTMMixin, Base):
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(80), unique=True)
+    linkspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("linkspaces.id"), index=True)
+    tracking_base_url: Mapped[str | None] = mapped_column(String(300))
+    tracking_path_prefix: Mapped[str | None] = mapped_column(String(50))
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("campaigns.id"), index=True)
     status: Mapped[str] = mapped_column(String(16), default="active")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -76,6 +80,35 @@ class Link(UTMMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    @property
+    def tracking_url(self) -> str:
+        from app.config import get_settings
+        from app.linkspace_config import tracking_url
+
+        return tracking_url(
+            self.tracking_base_url or get_settings().public_base_url,
+            self.tracking_path_prefix if self.tracking_path_prefix is not None else "r",
+            self.slug,
+        )
+
+
+class Linkspace(Base):
+    __tablename__ = "linkspaces"
+    __table_args__ = (
+        UniqueConstraint("base_url", "path_prefix", name="uq_linkspaces_configuration"),
+        CheckConstraint("NOT is_default OR is_active", name="ck_linkspaces_active_default"),
+        Index(
+            "uq_linkspaces_default", "is_default", unique=True, postgresql_where=text("is_default")
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100))
+    base_url: Mapped[str] = mapped_column(String(300))
+    path_prefix: Mapped[str] = mapped_column(String(50), default="r")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Destination(Base):

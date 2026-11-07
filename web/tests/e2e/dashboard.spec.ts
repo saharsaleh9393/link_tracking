@@ -48,6 +48,7 @@ test("English default ignores browser language; switching preserves form and rou
     "مقصدها",
     "تحلیل ترافیک",
     "گزارش کلیک‌ها",
+    "تنظیمات لینک",
   ]);
 });
 test("campaign autocomplete is explicit, keyboard accessible, clearable; duplicate names fail", async ({
@@ -338,5 +339,171 @@ test("click report cursor pagination is preserved through the authenticated UI",
     expect(csv.split("\r\n").filter(Boolean).length).toBeGreaterThan(1);
     expect(csv.split("\r\n")[0]).toContain(header);
     expect(csv.split("\r\n")[0]).toContain("total_clicks");
+  }
+});
+
+test("Link Settings preserves bilingual forms and existing link URLs when defaults change", async ({
+  page,
+  request,
+}) => {
+  const configKeys = [
+    "name",
+    "base_url",
+    "path_prefix",
+    "is_active",
+    "is_default",
+  ];
+  const original = (
+    await (
+      await request.get(backend + "/api/v1/linkspaces", { headers })
+    ).json()
+  ).find((space: { is_default: boolean }) => space.is_default);
+  const name = "Browser space " + unique();
+  const prefix = "go-" + unique();
+  const editedPrefix = "visit-" + unique();
+  let createdSpace: { id: string } | undefined;
+  try {
+    await login(page);
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Link Settings", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Create Linkspace", exact: true })
+      .click();
+    await page.getByLabel("Linkspace name", { exact: true }).fill(name);
+    await page.getByLabel("Base URL / domain", { exact: true }).fill(backend);
+    await page.getByLabel("Path prefix", { exact: true }).fill(prefix);
+    await page.getByRole("button", { name: "FA", exact: true }).click();
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(page.getByLabel("نام فضای لینک", { exact: true })).toHaveValue(
+      name,
+    );
+    await page.getByRole("button", { name: "EN", exact: true }).click();
+    await expect(page.getByRole("dialog").locator("code")).toHaveText(
+      backend + "/" + prefix + "/slug",
+    );
+    await page
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const row = page.getByRole("row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    const spaces = await (
+      await request.get(backend + "/api/v1/linkspaces", { headers })
+    ).json();
+    createdSpace = spaces.find(
+      (space: { name: string }) => space.name === name,
+    );
+    expect(createdSpace).toBeTruthy();
+    await row
+      .getByRole("button", { name: "Set as default", exact: true })
+      .click();
+    await expect(row.getByText("Default", { exact: true })).toBeVisible();
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Links", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Create tracking link", exact: true })
+      .click();
+    const slug = "space-" + unique();
+    await page.getByLabel("Custom slug (optional)", { exact: true }).fill(slug);
+    await expect(page.getByRole("dialog").locator("code")).toHaveText(
+      backend + "/" + prefix + "/" + slug,
+    );
+    await page
+      .getByLabel("Linkspace", { exact: true })
+      .selectOption(original.id);
+    await expect(page.getByRole("dialog").locator("code")).toHaveText(
+      original.base_url + "/r/" + slug,
+    );
+    await page.getByLabel("Linkspace", { exact: true }).selectOption("");
+    await page
+      .getByLabel("Destination URL", { exact: true })
+      .fill("https://example.com/?signature=a%2Fb");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Create tracking link", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const linkRow = page.getByRole("row").filter({ hasText: slug });
+    await expect(linkRow.locator("code")).toHaveText(
+      backend + "/" + prefix + "/" + slug,
+    );
+    const redirect = await request.get(backend + "/" + prefix + "/" + slug, {
+      maxRedirects: 0,
+    });
+    expect(redirect.status()).toBe(302);
+    expect(redirect.headers().location).toBe(
+      "https://example.com/?signature=a%2Fb",
+    );
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Link Settings", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Edit " + name, exact: true })
+      .click();
+    await page.getByLabel("Path prefix", { exact: true }).fill(editedPrefix);
+    await page
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Links", exact: true })
+      .click();
+    await expect(
+      page.getByRole("row").filter({ hasText: slug }).locator("code"),
+    ).toHaveText(backend + "/" + prefix + "/" + slug);
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Link Settings", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Create Linkspace", exact: true })
+      .click();
+    await page
+      .getByLabel("Linkspace name", { exact: true })
+      .fill("Pending domain");
+    await page
+      .getByLabel("Base URL / domain", { exact: true })
+      .fill("https://short.example.com");
+    await page.getByLabel("Path prefix", { exact: true }).fill("");
+    await page
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+      "LINKSPACE_ROOT_ORIGINS",
+    );
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  } finally {
+    const body = Object.fromEntries(
+      configKeys.map((key) => [key, original[key]]),
+    );
+    expect(
+      (
+        await request.put(backend + "/api/v1/linkspaces/" + original.id, {
+          headers,
+          data: { ...body, is_default: true },
+        })
+      ).status(),
+    ).toBe(200);
+    if (createdSpace) {
+      const spaces = await (
+        await request.get(backend + "/api/v1/linkspaces", { headers })
+      ).json();
+      const space = spaces.find(
+        (item: { id: string }) => item.id === createdSpace?.id,
+      );
+      const values = Object.fromEntries(
+        configKeys.map((key) => [key, space[key]]),
+      );
+      await request.put(backend + "/api/v1/linkspaces/" + space.id, {
+        headers,
+        data: { ...values, is_default: false, is_active: false },
+      });
+    }
   }
 });

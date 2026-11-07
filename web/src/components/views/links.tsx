@@ -35,7 +35,7 @@ import {
 } from "../ui/dialog";
 import { LinkForm } from "../forms/link-form";
 import { Destinations } from "../forms/destinations";
-export function LinksView({ publicBase }: { publicBase: string }) {
+export function LinksView() {
   const t = useTranslations(),
     date = useDateFormat(),
     query = useSearchParams();
@@ -106,7 +106,7 @@ export function LinksView({ publicBase }: { publicBase: string }) {
           </span>
           <div>
             <p className="font-medium">{row.original.slug}</p>
-            <CopyUrl compact value={`${publicBase}/r/${row.original.slug}`} />
+            <CopyUrl compact value={row.original.tracking_url} />
           </div>
         </div>
       ),
@@ -190,7 +190,7 @@ export function LinksView({ publicBase }: { publicBase: string }) {
       {success && <Toast key={version} message={t("success")} />}{" "}
       {created && (
         <div className="mb-5">
-          <CopyUrl value={publicBase + "/r/" + created.slug} />
+          <CopyUrl value={created.tracking_url} />
         </div>
       )}
       <ErrorNotice
@@ -307,7 +307,7 @@ export function LinksView({ publicBase }: { publicBase: string }) {
                 {t("linkDetails")}
               </DialogTitle>
               <div className="mt-5">
-                <CopyUrl value={publicBase + "/r/" + editing.slug} />
+                <CopyUrl value={editing.tracking_url} />
               </div>
               <LinkForm
                 key={editing.id + ":" + editing.version}

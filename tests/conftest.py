@@ -14,6 +14,9 @@ os.environ["VISITOR_HMAC_KEY"] = "test-visitor-" + "c" * 40
 os.environ["TRUSTED_PROXY_CIDRS"] = ""
 os.environ["COUNTRY_HEADER"] = ""
 os.environ["DESTINATION_ALLOWED_HOSTS"] = ""
+os.environ["PUBLIC_BASE_URL"] = "http://127.0.0.1:8000"
+os.environ["LINKSPACE_ROUTED_ORIGINS"] = ""
+os.environ["LINKSPACE_ROOT_ORIGINS"] = ""
 if TEST_URL:
     os.environ["DATABASE_URL"] = TEST_URL
 
@@ -44,7 +47,13 @@ def client(database):
     with database.begin() as connection:
         connection.execute(
             text("""TRUNCATE campaigns, links, link_destinations, click_events,
-            daily_link_stats, daily_campaign_stats, audit_events, aggregation_state CASCADE""")
+            daily_link_stats, daily_campaign_stats, audit_events, aggregation_state, linkspaces CASCADE""")
+        )
+        connection.execute(
+            text("""INSERT INTO linkspaces
+            (id, name, base_url, path_prefix, is_active, is_default)
+            VALUES ('00000000-0000-0000-0000-000000000003', 'Original links',
+            'http://127.0.0.1:8000', 'r', true, true)""")
         )
     with link_cache.lock:
         link_cache.data.clear()

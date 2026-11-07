@@ -78,6 +78,7 @@ class LinkCreate(UTMFields):
     campaign_id: uuid.UUID | None = None
     expires_at: datetime | None = None
     forward_utm: bool = False
+    linkspace_id: uuid.UUID | None = None
 
     @field_validator("destination_url")
     @classmethod
@@ -118,6 +119,8 @@ class LinkOut(UTMFields):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     slug: str
+    linkspace_id: uuid.UUID | None
+    tracking_url: str
     campaign_id: uuid.UUID | None
     status: str
     expires_at: datetime | None

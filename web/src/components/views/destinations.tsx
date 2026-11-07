@@ -9,7 +9,7 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Destinations } from "../forms/destinations";
-export function DestinationsView({ publicBase }: { publicBase: string }) {
+export function DestinationsView() {
   const t = useTranslations();
   const [q, setQ] = useState(""),
     [term, setTerm] = useState(""),
@@ -79,7 +79,7 @@ export function DestinationsView({ publicBase }: { publicBase: string }) {
             <Loading />
           ) : selected ? (
             <>
-              <CopyUrl value={publicBase + "/r/" + selected.slug} />
+              <CopyUrl value={selected.tracking_url} />
               <Destinations
                 key={selected.id}
                 link={selected}

@@ -15,7 +15,9 @@ async function handle(request: Request, context: Context) {
   if (query.toString().length > 8192)
     return NextResponse.json({ code: "VALIDATION" }, { status: 422 });
   const body =
-    request.method === "POST" || request.method === "PATCH"
+    request.method === "POST" ||
+    request.method === "PATCH" ||
+    request.method === "PUT"
       ? await request.text()
       : undefined;
   if (body && Buffer.byteLength(body) > 16384)
@@ -41,4 +43,10 @@ async function handle(request: Request, context: Context) {
     { status: result.status, headers },
   );
 }
-export { handle as GET, handle as POST, handle as PATCH, handle as DELETE };
+export {
+  handle as GET,
+  handle as POST,
+  handle as PATCH,
+  handle as PUT,
+  handle as DELETE,
+};

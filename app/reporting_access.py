@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.country import country_lookup
 from app.db import session_dependency
+from app.linkspace_config import tracking_url
 from app.models import Campaign, Link
 from app.security import require_reporting
 
@@ -52,13 +53,27 @@ def link_catalog(
     limit: int = Query(500, ge=1, le=500),
     session: Session = Depends(session_dependency),
 ):
-    return catalog_page(
+    page = catalog_page(
         session,
         Link,
-        (Link.id, Link.slug, Link.campaign_id, Link.status, Link.created_at),
+        (
+            Link.id,
+            Link.slug,
+            Link.campaign_id,
+            Link.status,
+            Link.created_at,
+            Link.linkspace_id,
+            Link.tracking_base_url,
+            Link.tracking_path_prefix,
+        ),
         after,
         limit,
     )
+    for row in page["items"]:
+        base = row.pop("tracking_base_url") or get_settings().public_base_url
+        prefix = row.pop("tracking_path_prefix")
+        row["tracking_url"] = tracking_url(base, "r" if prefix is None else prefix, row["slug"])
+    return page
 
 
 @router.get("/campaigns")

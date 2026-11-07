@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import session_dependency
+from app.linkspaces import select_for_link
 from app.models import AuditEvent, Campaign, Destination, Link
 from app.schemas import (
     UTM_FIELDS,
@@ -83,6 +84,9 @@ def resolve_link(session: Session, slug: str):
             "status",
             "expires_at",
             "forward_utm",
+            "slug",
+            "tracking_base_url",
+            "tracking_path_prefix",
             *UTM_FIELDS,
         )
     }
@@ -190,11 +194,17 @@ def update_campaign(
 def create_link(body: LinkCreate, session: Session = Depends(session_dependency)):
     require_campaign(session, body.campaign_id)
     link_id, destination_id = uuid.uuid4(), uuid.uuid4()
-    data = body.model_dump(exclude={"destination_url", "slug"})
+    # A letter prefix also makes generated slugs safe for dedicated root-level routing.
+    slug = body.slug or "l" + secrets.token_urlsafe(9)
+    space = select_for_link(session, body.linkspace_id, slug)
+    data = body.model_dump(exclude={"destination_url", "slug", "linkspace_id"})
     link = Link(
         id=link_id,
         active_destination_id=destination_id,
-        slug=body.slug or secrets.token_urlsafe(9),
+        slug=slug,
+        linkspace_id=space.id,
+        tracking_base_url=space.base_url,
+        tracking_path_prefix=space.path_prefix,
         **data,
     )
     session.add(link)

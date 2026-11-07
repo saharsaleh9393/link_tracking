@@ -87,6 +87,8 @@ If FastAPI uses another port, set `TRACKER_API_URL` in `web\.env.local`; `PUBLIC
 
 ## Included workflows
 
+- **Settings → Link Settings:** multiple PostgreSQL-backed Linkspaces, URL previews, default/active selection, and per-link URL snapshots. [Migration, Windows commands and manual domain routing](docs/link-settings.md).
+
 - Overview KPIs, 7-day click activity and recent management activity.
 - Campaign autocomplete with keyboard support, explicit Search/Enter, Clear, case-insensitive matching, newest-first records, status, link counts, sorting and pagination.
 - Trimmed campaign names with database-enforced uniqueness, including concurrent requests; create/edit/archive/restore without touching historical clicks.

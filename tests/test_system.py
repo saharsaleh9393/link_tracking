@@ -504,7 +504,8 @@ def test_retention_preserves_aggregates(client, database):
     purge_expired()
     with database.connect() as connection:
         assert connection.scalar(text("SELECT to_regclass(:name)"), {"name": name})
-    for _ in range(7):
+    # The start is a month boundary, so seven batches are insufficient on some dates.
+    for _ in range((today - old_month).days // 31 + 1):
         aggregate()
     with Session(database) as session:
         assert session.get(AggregationState, "daily").next_day == today

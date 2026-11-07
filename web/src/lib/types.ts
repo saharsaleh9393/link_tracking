@@ -17,6 +17,8 @@ export type Utms = Record<(typeof utmKeys)[number], string | null>;
 export type Link = Utms & {
   id: string;
   slug: string;
+  linkspace_id: string | null;
+  tracking_url: string;
   campaign_id: string | null;
   status: "active" | "disabled" | "deleted";
   expires_at: string | null;

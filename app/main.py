@@ -18,6 +18,8 @@ from app.csv_exports import router as csv_router
 from app.db import get_engine, session_dependency
 from app.links import resolve_link
 from app.links import router as management_router
+from app.linkspace_config import RESERVED, matches_route
+from app.linkspaces import router as linkspace_router
 from app.models import ClickEvent
 from app.reporting import router as reporting_router
 from app.reporting_access import router as reporting_access_router
@@ -38,6 +40,7 @@ async def lifespan(app):
 
 app = FastAPI(title="Marketing Link Tracking", version="0.1.0", lifespan=lifespan)
 app.include_router(management_router)
+app.include_router(linkspace_router)
 app.include_router(reporting_router)
 app.include_router(csv_router)
 app.include_router(reporting_access_router)
@@ -80,7 +83,7 @@ def live():
 @app.get("/health/ready", tags=["Operations"])
 def ready(session: Session = Depends(session_dependency)):
     revision = session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
-    if revision != "0002":
+    if revision != "0003":
         raise HTTPException(503, "Database migration required")
     partition = session.scalar(
         text("SELECT to_regclass(:name)"), {"name": f"click_events_{datetime.now(UTC):%Y_%m}"}
@@ -97,6 +100,10 @@ def metrics():
 
 @app.api_route("/r/{slug}", methods=["GET", "HEAD"], tags=["Redirect"])
 def redirect(slug: str, request: Request):
+    return perform_redirect(slug, request)
+
+
+def perform_redirect(slug: str, request: Request, custom_path: str | None = None):
     started = monotonic()
     if not re.fullmatch(r"[A-Za-z0-9_-]{3,80}", slug):
         raise HTTPException(404, "Link not found")
@@ -112,6 +119,10 @@ def redirect(slug: str, request: Request):
             # End the read transaction before acquiring the event-write transaction.
             session.rollback()
         if link is None:
+            raise HTTPException(404, "Link not found")
+        if custom_path is not None and not matches_route(
+            link, custom_path, request.headers.get("host", "")
+        ):
             raise HTTPException(404, "Link not found")
         now = datetime.now(UTC)
         if link["status"] != "active" or (link["expires_at"] and link["expires_at"] <= now):
@@ -150,3 +161,16 @@ def redirect(slug: str, request: Request):
         redirects.labels("recorded" if recorded else "unrecorded").inc()
         latency.observe(monotonic() - started)
         return RedirectResponse(destination, status_code=302)
+
+
+@app.api_route("/{tracking_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+def configured_redirect(tracking_path: str, request: Request):
+    parts = tracking_path.split("/")
+    if (
+        len(parts) not in {1, 2}
+        or parts[0].lower() in RESERVED
+        or parts[0].startswith("_")
+        or (len(parts) == 2 and not re.fullmatch(r"[a-z0-9_-]{1,50}", parts[0]))
+    ):
+        raise HTTPException(404, "Link not found")
+    return perform_redirect(parts[-1], request, custom_path=tracking_path)

@@ -4,7 +4,8 @@ import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import type { Campaign, Link } from "@/lib/types";
 import { utmKeys } from "@/lib/types";
-import { request, ApiError } from "@/lib/client";
+import { request, ApiError, useResource } from "@/lib/client";
+import { linkPreview, type Linkspace } from "@/lib/linkspaces";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -21,6 +22,15 @@ export function LinkForm({
   onCancel: () => void;
 }) {
   const t = useTranslations();
+  const spaces = useResource<Linkspace[]>("linkspaces", {
+    active_only: true,
+    limit: 500,
+  });
+  const [spaceId, setSpaceId] = useState(""),
+    [previewSlug, setPreviewSlug] = useState("");
+  const selectedSpace = spaces.data?.find((space) =>
+    spaceId ? space.id === spaceId : space.is_default,
+  );
   const [error, setError] = useState(""),
     [validation, setValidation] = useState(""),
     [busy, setBusy] = useState(false);
@@ -69,6 +79,7 @@ export function LinkForm({
     } else {
       body.destination_url = destination;
       body.slug = slug || null;
+      body.linkspace_id = spaceId || null;
     }
     setBusy(true);
     try {
@@ -91,6 +102,49 @@ export function LinkForm({
       {!link && (
         <>
           <div>
+            <Label htmlFor="linkspace_id">{t("linkspace")}</Label>
+            <select
+              id="linkspace_id"
+              name="linkspace_id"
+              className="w-full"
+              value={spaceId}
+              onChange={(event) => setSpaceId(event.target.value)}
+              disabled={spaces.loading}
+            >
+              <option value="">{t("automaticLinkspace")}</option>
+              {spaces.data?.map((space) => (
+                <option key={space.id} value={space.id}>
+                  {space.name}
+                  {space.is_default ? " · " + t("defaultLinkspace") : ""}
+                </option>
+              ))}
+            </select>
+            <ErrorNotice code={spaces.error} />
+            {selectedSpace && (
+              <>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("urlPreview")}
+                </p>
+                <code dir="ltr" className="mt-1 block break-all text-xs">
+                  {linkPreview(
+                    selectedSpace.base_url,
+                    selectedSpace.path_prefix,
+                    previewSlug,
+                  )}
+                </code>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t(selectedSpace.configuration_status)}
+                </p>
+                {selectedSpace.configuration_status ===
+                  "pending_configuration" && (
+                  <p role="status" className="mt-2 text-xs text-amber-800">
+                    {t("linkspaceDeploymentHint")}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          <div>
             <Label htmlFor="destination_url">{t("destination")}</Label>
             <Input
               id="destination_url"
@@ -106,7 +160,14 @@ export function LinkForm({
           </div>
           <div>
             <Label htmlFor="slug">{t("slug")}</Label>
-            <Input id="slug" name="slug" dir="ltr" maxLength={80} />
+            <Input
+              id="slug"
+              name="slug"
+              dir="ltr"
+              maxLength={80}
+              value={previewSlug}
+              onChange={(event) => setPreviewSlug(event.target.value)}
+            />
             <p className="mt-1.5 text-xs text-muted-foreground">
               {t("slugHint")}
             </p>
@@ -193,7 +254,12 @@ export function LinkForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           {t("cancel")}
         </Button>
-        <Button disabled={busy}>
+        <Button
+          disabled={
+            busy ||
+            (!link && (spaces.loading || !!spaces.error || !selectedSpace))
+          }
+        >
           {busy && <Loader2 className="animate-spin" />}
           {t(link ? "save" : "newLink")}
         </Button>

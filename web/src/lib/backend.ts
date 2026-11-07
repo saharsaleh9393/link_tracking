@@ -2,19 +2,22 @@ import "server-only";
 import { jsonReportPath, reportCsv } from "./csv";
 const uuid = "[0-9a-fA-F-]{36}";
 const resources = new RegExp(
-  `^(links|campaigns|links/${uuid}|campaigns/${uuid}|links/${uuid}/destinations|management/overview|reporting/(status|links|campaigns)|analytics/(summary|trends|breakdowns|link-comparison|trends\\.csv|breakdowns\\.csv)|exports/clicks(?:\\.csv)?)$`,
+  `^(links|campaigns|linkspaces|linkspaces/${uuid}|links/${uuid}|campaigns/${uuid}|links/${uuid}/destinations|management/overview|reporting/(status|links|campaigns)|analytics/(summary|trends|breakdowns|link-comparison|trends\\.csv|breakdowns\\.csv)|exports/clicks(?:\\.csv)?)$`,
 );
 export function allowedRoute(path: string, method: string) {
   if (!resources.test(path)) return false;
   if (method === "GET") return true;
   if (method === "POST")
     return (
-      /^(links|campaigns)$/.test(path) ||
+      /^(links|campaigns|linkspaces)$/.test(path) ||
       new RegExp(`^links/${uuid}/destinations$`).test(path)
     );
   if (method === "PATCH")
     return new RegExp(`^(links|campaigns)/${uuid}$`).test(path);
-  return method === "DELETE" && new RegExp(`^links/${uuid}$`).test(path);
+  if (method === "PUT") return new RegExp(`^linkspaces/${uuid}$`).test(path);
+  return (
+    method === "DELETE" && new RegExp(`^(links|linkspaces)/${uuid}$`).test(path)
+  );
 }
 export function statusCode(status: number) {
   return (
@@ -106,7 +109,27 @@ export async function backend(
         };
       return reportCsv(path, await jsonResponse.json());
     }
-    if (!response.ok)
+    if (!response.ok) {
+      if (
+        path === "linkspaces" ||
+        path.startsWith("linkspaces/") ||
+        path === "links"
+      ) {
+        const detail = await response.json().catch(() => null);
+        const code = detail?.detail?.code;
+        if (
+          [
+            "LINKSPACE_ROOT_UNSAFE",
+            "LINKSPACE_RESERVED_SLUG",
+            "LINKSPACE_UNAVAILABLE",
+            "LINKSPACE_DUPLICATE",
+            "LINKSPACE_DEFAULT_ACTIVE",
+            "LINKSPACE_SELECT_DEFAULT",
+            "LINKSPACE_IN_USE",
+          ].includes(code)
+        )
+          return { error: code, status: response.status };
+      }
       return {
         error:
           response.status === 409 && path.startsWith("campaigns")
@@ -114,6 +137,7 @@ export async function backend(
             : statusCode(response.status),
         status: response.status,
       };
+    }
     if (path.endsWith(".csv"))
       return {
         csv: await response.arrayBuffer(),

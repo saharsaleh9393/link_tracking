@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     report_api_key: SecretStr
     visitor_hmac_key: SecretStr
     public_base_url: str = "http://127.0.0.1:8000"
+    # Operator attestations after DNS/TLS/proxy setup; these cannot be set by the UI.
+    linkspace_routed_origins: str = ""
+    linkspace_root_origins: str = ""
     destination_allowed_hosts: str = ""
     trusted_proxy_cidrs: str = ""
     country_header: str = ""

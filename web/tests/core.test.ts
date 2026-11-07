@@ -11,6 +11,7 @@ import { allowedRoute, backend } from "../src/lib/backend";
 import { reportRange } from "../src/lib/utils";
 import { sameOrigin } from "../src/lib/auth";
 import { reportCsv, jsonReportPath } from "../src/lib/csv";
+import { linkPreview } from "../src/lib/linkspaces";
 describe("bilingual messages", () => {
   it("has the same translated keys and interpolation variables", () => {
     expect(Object.keys(fa).sort()).toEqual(Object.keys(en).sort());
@@ -47,6 +48,13 @@ describe("API boundary", () => {
     vi.unstubAllEnvs();
   });
   it("restricts forwarding to explicit backend routes", () => {
+    const space = "linkspaces/00000000-0000-0000-0000-000000000003";
+    expect(allowedRoute("linkspaces", "GET")).toBe(true);
+    expect(allowedRoute("linkspaces", "POST")).toBe(true);
+    expect(allowedRoute(space, "PUT")).toBe(true);
+    expect(allowedRoute(space, "DELETE")).toBe(true);
+    expect(allowedRoute("linkspaces", "PUT")).toBe(false);
+    expect(allowedRoute("linkspaces/../../health", "PUT")).toBe(false);
     expect(allowedRoute("exports/clicks.csv", "GET")).toBe(true);
     expect(allowedRoute("reporting/links", "GET")).toBe(true);
     expect(allowedRoute("exports/clicks.csv", "POST")).toBe(false);
@@ -209,6 +217,41 @@ describe("API boundary", () => {
     await backend("analytics/summary", "GET", new URLSearchParams());
     expect(authorization).toBe("Bearer test-report-key");
   });
+  it("localizes only known Linkspace error codes and keeps configuration calls administrative", async () => {
+    vi.stubEnv("ADMIN_API_KEY", "admin-secret");
+    let key = "";
+    const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      key = new Headers(init?.headers).get("Authorization") || "";
+      return Response.json(
+        { detail: { code: "LINKSPACE_ROOT_UNSAFE", private: "PRIVATE" } },
+        { status: 422 },
+      );
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const result = await backend(
+      "linkspaces",
+      "POST",
+      new URLSearchParams(),
+      "{}",
+    );
+    expect(result).toEqual({ error: "LINKSPACE_ROOT_UNSAFE", status: 422 });
+    expect(key).toBe("Bearer admin-secret");
+    expect(JSON.stringify(result)).not.toContain("PRIVATE");
+    fetcher.mockImplementation(async () =>
+      Response.json({ detail: { code: "PRIVATE" } }, { status: 422 }),
+    );
+    expect(
+      await backend("linkspaces", "POST", new URLSearchParams(), "{}"),
+    ).toEqual({ error: "VALIDATION", status: 422 });
+  });
+});
+it("previews root and prefixed Linkspace URLs consistently", () => {
+  expect(linkPreview("https://go.example.com/", "")).toBe(
+    "https://go.example.com/slug",
+  );
+  expect(linkPreview("http://localhost:8000", "/GO/", "launch")).toBe(
+    "http://localhost:8000/go/launch",
+  );
 });
 it("serializes legacy JSON with Persian text, safe spreadsheet cells and no private columns", () => {
   const report = reportCsv("exports/clicks.csv", {
