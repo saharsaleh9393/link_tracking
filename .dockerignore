@@ -1,8 +1,15 @@
 .git
 .env
 .env.*
-.venv
+**/.env*
+**/node_modules
+**/.next
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/__pycache__
 .local
+.venv
 __pycache__
 .pytest_cache
 .ruff_cache

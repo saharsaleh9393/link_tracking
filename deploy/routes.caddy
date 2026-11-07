@@ -1,0 +1,58 @@
+(safe_headers) {
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
+}
+(api_proxy) {
+    reverse_proxy api:8000 {
+        header_up Host {http.request.hostport}
+        header_up X-Forwarded-Host {http.request.host}
+        header_up X-Forwarded-Proto {http.request.scheme}
+        header_up X-Forwarded-For {http.request.remote.host}
+        header_up -Forwarded
+        header_up -CF-IPCountry
+        header_up -X-Country
+    }
+}
+(dashboard) {
+    import safe_headers
+    request_body {
+        max_size 32KB
+    }
+    @tracking path {$DASHBOARD_TRACKING_PATHS:/r/* /go/*}
+    handle @tracking {
+        import api_proxy
+    }
+    handle {
+        reverse_proxy web:3000 {
+            header_up Host {http.request.hostport}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+            header_up -Forwarded
+        }
+    }
+}
+(tracking) {
+    import safe_headers
+    request_body {
+        max_size 32KB
+    }
+    @reports {
+        method GET HEAD
+        path /api/v1/analytics/* /api/v1/exports/* /api/v1/reporting/*
+    }
+    handle @reports {
+        import api_proxy
+    }
+    @private path /api/* /health/* /metrics /docs /docs/* /redoc /openapi.json
+    handle @private {
+        respond 404
+    }
+    handle {
+        import api_proxy
+    }
+}

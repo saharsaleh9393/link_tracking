@@ -87,6 +87,8 @@ If FastAPI uses another port, set `TRACKER_API_URL` in `web\.env.local`; `PUBLIC
 
 ## Included workflows
 
+Production containers and a Windows HTTP-only production simulation are available in [the deployment guide](docs/deployment.md). They use separate Compose files, secrets and database volumes; the native development steps above are unchanged.
+
 - **Settings → Link Settings:** multiple PostgreSQL-backed Linkspaces, URL previews, default/active selection, and per-link URL snapshots. [Migration, Windows commands and manual domain routing](docs/link-settings.md).
 
 - Overview KPIs, 7-day click activity and recent management activity.

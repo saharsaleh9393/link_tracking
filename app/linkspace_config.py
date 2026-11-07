@@ -130,6 +130,8 @@ def local_demo_origin(base_url: str) -> bool:
 
 
 def root_allowed(base_url: str) -> bool:
+    if get_settings().dashboard_origin and base_url == get_settings().dashboard_origin.rstrip("/"):
+        return False
     # Auto-approval is limited to a dedicated .localhost hostname on the local API port.
     # Public deployments and bare localhost/IP roots still require operator approval.
     demo = local_demo_origin(base_url) and (urlsplit(base_url).hostname or "").endswith(

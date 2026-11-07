@@ -69,3 +69,28 @@ jobs:
       - name: Browser workflows
         working-directory: web
         run: npx playwright install --with-deps chromium && npm run test:e2e
+
+  deployment-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Initialize isolated deployment inputs
+        run: python deploy/init_deployment.py --mode simulation
+      - name: Build pinned production images
+        run: docker compose --env-file .env.simulation -f compose.production.yaml -f compose.simulation.yaml build api web
+      - name: Migrate and start HTTP simulation
+        run: |
+          docker compose --env-file .env.simulation -f compose.production.yaml -f compose.simulation.yaml up -d --wait db
+          docker compose --env-file .env.simulation -f compose.production.yaml -f compose.simulation.yaml --profile ops run --rm migrate
+          docker compose --env-file .env.simulation -f compose.production.yaml -f compose.simulation.yaml up -d --wait
+      - name: Public ingress smoke workflows
+        run: python deploy/smoke.py --env-file .env.simulation --connect-url http://127.0.0.1:8080 --write
+      - name: Service state
+        if: always()
+        run: docker compose --env-file .env.simulation -f compose.production.yaml -f compose.simulation.yaml ps
+      - name: Stop isolated stack without deleting volumes
+        if: always()
+        run: docker compose --env-file .env.simulation -f compose.production.yaml -f compose.simulation.yaml down

@@ -1,0 +1,25 @@
+{
+    admin off
+    email {$ACME_EMAIL}
+    log default {
+        output stdout
+        format json
+        exclude http.log.access http.log.error
+    }
+}
+import /etc/caddy/routes.caddy
+{$DASHBOARD_SITE} {
+    import dashboard
+    header Strict-Transport-Security "max-age=31536000"
+}
+{$TRACKING_SITES} {
+    import tracking
+    header Strict-Transport-Security "max-age=31536000"
+}
+:8080 {
+    respond /healthz 200
+    respond 404
+}
+:80 {
+    respond 404
+}

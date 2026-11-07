@@ -5,10 +5,22 @@ from urllib.parse import urlsplit
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import get_settings
 
 bearer = HTTPBearer(auto_error=False)
+
+
+class ConfiguredTrustedHosts:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        hosts = [v.strip() for v in get_settings().http_allowed_hosts.split(",") if v.strip()]
+        await TrustedHostMiddleware(self.app, allowed_hosts=hosts or ["*"], www_redirect=False)(
+            scope, receive, send
+        )
 
 
 def authorize(credentials: HTTPAuthorizationCredentials | None, reporting: bool):

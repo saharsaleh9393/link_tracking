@@ -1,0 +1,5 @@
+# Shell scripts are mounted into Linux containers from Windows checkouts too.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+*.caddy text eol=lf

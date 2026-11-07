@@ -1,0 +1,23 @@
+{
+    admin off
+    auto_https off
+    log default {
+        output stdout
+        format json
+        exclude http.log.access http.log.error
+    }
+}
+import /etc/caddy/routes.caddy
+{$DASHBOARD_SITE} {
+    import dashboard
+}
+{$TRACKING_SITES} {
+    import tracking
+}
+:8080 {
+    respond /healthz 200
+    respond 404
+}
+:80 {
+    respond 404
+}

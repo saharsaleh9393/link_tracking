@@ -1,0 +1,249 @@
+name: ${COMPOSE_PROJECT_NAME:-linkspace}
+
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+x-app-env: &app-env
+  NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,db
+  no_proxy: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,db
+  APP_ENV: ${APP_ENV:?Set APP_ENV in the deployment env file}
+  DATABASE_URL_FILE: /run/secrets/app_database_url
+  ADMIN_API_KEY_FILE: /run/secrets/admin_api_key
+  REPORT_API_KEY_FILE: /run/secrets/report_api_key
+  VISITOR_HMAC_KEY_FILE: /run/secrets/visitor_hmac_key
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the public tracking origin}
+  DASHBOARD_ORIGIN: ${DASHBOARD_ORIGIN:?Set the dashboard origin}
+  HTTP_ALLOWED_HOSTS: ${HTTP_ALLOWED_HOSTS:?Set exact allowed hosts}
+  TRUSTED_PROXY_CIDRS: ${PROXY_IP:-172.30.50.2}/32
+  LINKSPACE_ROUTED_ORIGINS: ${LINKSPACE_ROUTED_ORIGINS:-}
+  LINKSPACE_ROOT_ORIGINS: ${LINKSPACE_ROOT_ORIGINS:-}
+  GEOIP_DATABASE_PATH: /geoip/country.mmdb
+  RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS:-90}
+  WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-60}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+x-backend: &backend
+  image: linkspace-api:${RELEASE_TAG:?Set an immutable release tag}
+  build:
+    context: .
+    dockerfile: Dockerfile
+  init: true
+  read_only: true
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  stop_grace_period: 45s
+  logging: *logs
+x-backend-secrets: &backend-secrets
+  - app_database_url
+  - admin_api_key
+  - report_api_key
+  - visitor_hmac_key
+x-geoip: &geoip
+  type: bind
+  source: ${GEOIP_DIRECTORY:-./.local/geoip}
+  target: /geoip
+  read_only: true
+
+services:
+  db:
+    image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-linkspace}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, owner_password, app_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-linkspace.sh:ro
+    command: [postgres, -c, log_statement=none, -c, log_min_error_statement=panic, -c, log_error_verbosity=terse, -c, log_parameter_max_length_on_error=0]
+    networks: [database]
+    stop_grace_period: 60s
+    logging: *logs
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  migrate:
+    <<: *backend
+    profiles: [ops]
+    command: [python, deploy/runtime.py, migrate]
+    restart: "no"
+    environment:
+      <<: *app-env
+      DATABASE_URL_FILE: /run/secrets/owner_database_url
+    secrets: [owner_database_url, admin_api_key, report_api_key, visitor_hmac_key]
+    networks: [database]
+    depends_on:
+      db: {condition: service_healthy}
+
+  api:
+    <<: *backend
+    restart: unless-stopped
+    environment: *app-env
+    secrets: *backend-secrets
+    volumes: [*geoip]
+    networks: [edge, database]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    <<: *backend
+    restart: unless-stopped
+    command: [python, deploy/runtime.py, worker]
+    stop_grace_period: 90s
+    environment:
+      <<: *app-env
+      DATABASE_URL_FILE: /run/secrets/owner_database_url
+      WORKER_HEARTBEAT_FILE: /tmp/worker-heartbeat
+    secrets: [owner_database_url, admin_api_key, report_api_key, visitor_hmac_key]
+    volumes: [*geoip]
+    networks: [database]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, deploy/runtime.py, worker-health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  web:
+    image: linkspace-web:${RELEASE_TAG:?Set an immutable release tag}
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /app/.next/cache:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 40s
+    environment:
+      APP_ENV: ${APP_ENV}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,db
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,db
+      HOSTNAME: 0.0.0.0
+      TRACKER_API_URL: http://api:8000
+      DASHBOARD_ORIGIN: ${DASHBOARD_ORIGIN}
+      DASHBOARD_SECURE_COOKIES: ${DASHBOARD_SECURE_COOKIES:?Set cookie security explicitly}
+      ADMIN_API_KEY_FILE: /run/secrets/admin_api_key
+      REPORT_API_KEY_FILE: /run/secrets/report_api_key
+      DASHBOARD_PASSWORD_FILE: /run/secrets/dashboard_password
+      DASHBOARD_SESSION_SECRET_FILE: /run/secrets/dashboard_session_secret
+    secrets: [admin_api_key, report_api_key, dashboard_password, dashboard_session_secret]
+    networks: [edge]
+    depends_on:
+      api: {condition: service_healthy}
+    logging: *logs
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  proxy:
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 40s
+    environment:
+      DASHBOARD_SITE: ${DASHBOARD_SITE:?Set the proxy dashboard site}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,db
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,::1},api,web,db
+      TRACKING_SITES: ${TRACKING_SITES:?Set the proxy tracking sites}
+      DASHBOARD_TRACKING_PATHS: ${DASHBOARD_TRACKING_PATHS:-/r/* /go/*}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - ${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-80}:80
+      - ${BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-443}:443
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/routes.caddy:/etc/caddy/routes.caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      edge:
+        ipv4_address: ${PROXY_IP:-172.30.50.2}
+      public: {}
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -Y, 'off', -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    logging: *logs
+
+  backup:
+    image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    profiles: [ops]
+    user: ${BACKUP_UID:-1000}:${BACKUP_GID:-1000}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-linkspace}
+    entrypoint: [bash, /ops/database.sh, backup]
+    secrets: [owner_password]
+    volumes:
+      - ./deploy/database.sh:/ops/database.sh:ro
+      - ${BACKUP_DIRECTORY:-./.local/backups}:/backups
+    networks: [database]
+    depends_on:
+      db: {condition: service_healthy}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *logs
+
+  restore:
+    extends: backup
+    entrypoint: [bash, /ops/database.sh, restore]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-linkspace}
+      BACKUP_FILE: ${BACKUP_FILE:-}
+
+secrets:
+  postgres_password: {file: '${SECRETS_DIRECTORY:?Initialize deployment secrets}/postgres_password'}
+  owner_password: {file: '${SECRETS_DIRECTORY}/owner_password'}
+  app_password: {file: '${SECRETS_DIRECTORY}/app_password'}
+  owner_database_url: {file: '${SECRETS_DIRECTORY}/owner_database_url'}
+  app_database_url: {file: '${SECRETS_DIRECTORY}/app_database_url'}
+  admin_api_key: {file: '${SECRETS_DIRECTORY}/admin_api_key'}
+  report_api_key: {file: '${SECRETS_DIRECTORY}/report_api_key'}
+  visitor_hmac_key: {file: '${SECRETS_DIRECTORY}/visitor_hmac_key'}
+  dashboard_password: {file: '${SECRETS_DIRECTORY}/dashboard_password'}
+  dashboard_session_secret: {file: '${SECRETS_DIRECTORY}/dashboard_session_secret'}
+
+networks:
+  public: {}
+  edge:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.50.0/24}
+          ip_range: ${EDGE_DYNAMIC_RANGE:-172.30.50.128/25}
+  database: {internal: true}
+volumes:
+  postgres_data: {}
+  caddy_data: {}
+  caddy_config: {}

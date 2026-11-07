@@ -2,8 +2,10 @@
 
 import argparse
 import logging
+import os
 import signal
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from threading import Event
 
 from sqlalchemy import text
@@ -155,6 +157,8 @@ def main():
     while not stop.is_set():
         try:
             run_once()
+            if path := os.environ.get("WORKER_HEARTBEAT_FILE"):
+                Path(path).touch()
             logger.info("maintenance_completed")
         except Exception as exc:
             # Never log exception payloads that may contain query parameters.

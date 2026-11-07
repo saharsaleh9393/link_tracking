@@ -6,6 +6,8 @@ import { resolve } from "node:path";
 // Root settings are server-only. Never use nextConfig.env or NEXT_PUBLIC_* for credentials.
 config({ path: resolve(process.cwd(), "../.env"), quiet: true });
 const nextConfig: NextConfig = {
+  output:
+    process.env.LINKSPACE_STANDALONE === "true" ? "standalone" : undefined,
   poweredByHeader: false,
   async headers() {
     return [

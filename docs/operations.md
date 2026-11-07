@@ -1,5 +1,7 @@
 # Operations and deployment readiness
 
+For the implemented Docker Compose deployment, local Windows simulation, exact environment settings, backup/restore drill and release rollback, see [Container deployment](deployment.md). `compose.yaml` below still refers to the original development database; `compose.production.yaml` is the separate production stack. Server discovery remains mandatory before any actual deployment.
+
 ## Production environment discovery comes first
 
 No remote server was accessed or deployed by this implementation. Before selecting commands or overwriting configuration, inspect the authorized SSH host for OS/version, CPU, RAM, disk, architecture, Python/container support, current services, reverse proxy, TLS ownership, ports, PostgreSQL version and backup tooling. Inspect existing application/service definitions and preserve them. Windows and Linux need different service managers; do not assume either.

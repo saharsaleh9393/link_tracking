@@ -1,0 +1,7 @@
+# Compose >= 2.24.4; replace HTTPS publishing/config, never append to production ports.
+services:
+  proxy:
+    ports: !override
+      - 127.0.0.1:${HTTP_PORT:-8080}:80
+    volumes:
+      - ./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro

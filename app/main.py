@@ -23,8 +23,8 @@ from app.linkspaces import router as linkspace_router
 from app.models import ClickEvent
 from app.reporting import router as reporting_router
 from app.reporting_access import router as reporting_access_router
-from app.security import require_admin
-from app.tracking import collect_metadata, effective_utms, redirect_url
+from app.security import ConfiguredTrustedHosts, require_admin
+from app.tracking import collect_metadata, effective_utms, redirect_url, trusted_peer
 
 logger = logging.getLogger("tracker")
 redirects = Counter("tracker_redirects_total", "Redirect outcomes", ["outcome"])
@@ -44,10 +44,17 @@ app.include_router(linkspace_router)
 app.include_router(reporting_router)
 app.include_router(csv_router)
 app.include_router(reporting_access_router)
+app.add_middleware(ConfiguredTrustedHosts)
 
 
 @app.middleware("http")
 async def response_headers(request: Request, call_next):
+    # Preserve the physical peer for trusted forwarding/country checks. Uvicorn's
+    # proxy middleware would replace it, so accept only the scheme here.
+    if trusted_peer(request):
+        scheme = request.headers.get("x-forwarded-proto", "")
+        if scheme in {"http", "https"}:
+            request.scope["scheme"] = scheme
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
